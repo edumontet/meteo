@@ -24,7 +24,7 @@ Le lieu suit ta position GPS (Rennes par défaut). Touche le nom du lieu en haut
 Toutes gratuites et sans clé :
 
 - [Open-Meteo](https://open-meteo.com) : prévisions (Météo-France AROME/ARPEGE, ECMWF, NOAA GFS), sol, géocodage.
-- [RainViewer](https://www.rainviewer.com) : radar des 2 dernières heures. [Windy](https://www.windy.com) : cartes de prévision.
+- [RainViewer](https://www.rainviewer.com) : radar de la dernière heure. [EUMETSAT](https://view.eumetsat.int) : images satellite Meteosat (nuages). [Windy](https://www.windy.com) : carte de pluie prévue.
 - [Blitzortung.org](https://www.blitzortung.org) : foudre en temps réel (réseau participatif, usage personnel).
 - [NASA SDO](https://sdo.gsfc.nasa.gov) et [NOAA SWPC](https://www.swpc.noaa.gov) : Soleil et météo de l'espace.
 - Marées : constantes harmoniques [TICON-4](https://www.seanoe.org/data/00980/109129/) (CC BY 4.0) via [@neaps/tide-database](https://github.com/openwatersio/tide-database), calcul avec [@neaps/tide-predictor](https://github.com/openwatersio/neaps) (MIT). Coefficients calculés à Brest selon la méthode du SHOM (à 2 ou 3 points près). **Ne pas utiliser pour la navigation.**
