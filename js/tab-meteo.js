@@ -19,6 +19,7 @@ export async function render(el, { place }) {
   const url = `https://api.open-meteo.com/v1/forecast?latitude=${place.lat}&longitude=${place.lon}` +
     `&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,snowfall_sum,precipitation_probability_max,wind_gusts_10m_max,wind_speed_10m_max` +
     `&minutely_15=precipitation&past_minutely_15=2&forecast_minutely_15=10` +
+    `&hourly=precipitation,precipitation_probability` +
     `&current=temperature_2m,weather_code` +
     `&timezone=Europe%2FParis&past_days=1&forecast_days=7&timeformat=unixtime`;
   let data;
@@ -63,6 +64,7 @@ function renderDays(box, data) {
             <span class="mm"><span class="cold">${nf(x.min)}°</span> <span style="color:#9AA8C2">/</span> <span class="warm">${nf(x.max)}°</span></span>
           </button>`).join("")}
       </div>
+      ${rainDay(data, s.date, s.label)}
       ${stormBox(d)}
       <section class="card" style="margin-top:16px">
         <div class="card-head"><h2>${s.label}</h2><span class="sub">${dayShort(s.date)}</span></div>
@@ -77,6 +79,75 @@ function renderDays(box, data) {
     box.querySelectorAll(".day").forEach(b => b.addEventListener("click", () => { sel = +b.dataset.i; draw(); }));
   };
   draw();
+}
+
+/* ---------- Risque de pluie sur la journée ---------- */
+// Un niveau par heure, à partir de la probabilité ET de la quantité prévues :
+// 3 = pluie quasi sûre (rouge), 2 = probable (orange), 1 = possible (jaune), 0 = sec.
+const RAIN_LV = [
+  { word: "sec", col: "#22304D" },
+  { word: "possible", col: "#E8C14A" },
+  { word: "probable", col: "#FF9A4D" },
+  { word: "quasi sûre", col: "#E5484D" }
+];
+function rainLevel(prob, mm, past) {
+  if (past) return mm >= 1 ? 3 : mm >= 0.3 ? 2 : mm >= 0.1 ? 1 : 0; // ce qui est tombé
+  prob = prob ?? 0; mm = mm ?? 0;
+  if (prob >= 70 && mm >= 0.3) return 3;
+  if (prob >= 45 || mm >= 0.5) return 2;
+  if (prob >= 25 || mm >= 0.1) return 1;
+  return 0;
+}
+
+function rainDay(data, date, label) {
+  const h = data.hourly;
+  if (!h?.time) return "";
+  const start = parisMidnight(date).getTime(), end = parisMidnight(new Date(start + 30 * 3600000)).getTime();
+  const now = Date.now();
+  const hours = [];
+  h.time.forEach((t, i) => {
+    const ms = t * 1000; // pluie de l'heure qui suit l'heure affichée
+    if (ms >= start && ms < end) {
+      const past = ms + 3600000 <= now;
+      hours.push({ ms, mm: h.precipitation[i] ?? 0, prob: h.precipitation_probability?.[i], past, lv: rainLevel(h.precipitation_probability?.[i], h.precipitation[i], past) });
+    }
+  });
+  if (!hours.length) return "";
+  const isPast = hours.every(x => x.past);
+  const fmtH = ms => ms >= end ? "minuit" : new Date(ms).toLocaleTimeString("fr-FR", { hour: "2-digit", timeZone: "Europe/Paris" }).replace(/\s?h?$/, "") .replace(/^0/, "") + "h";
+
+  // Périodes de pluie : heures consécutives de niveau ≥ 1 (les heures déjà passées d'aujourd'hui comptent comme mesurées)
+  const periods = [];
+  hours.forEach(x => {
+    const last = periods[periods.length - 1];
+    if (x.lv > 0) {
+      if (last && last.to === x.ms) { last.to = x.ms + 3600000; last.max = Math.max(last.max, x.lv); last.mm += x.mm; }
+      else periods.push({ from: x.ms, to: x.ms + 3600000, max: x.lv, mm: x.mm });
+    }
+  });
+  const shown = label === "Aujourd'hui" ? periods.filter(p => p.to > now) : periods;
+  let lead;
+  if (isPast) lead = periods.length ? `Il a plu ${periods.map(p => `de ${fmtH(p.from)} à ${fmtH(p.to)}`).join(", puis ")}` : "Journée sèche";
+  else if (!shown.length) lead = label === "Aujourd'hui" ? "Plus de pluie prévue aujourd'hui" : "Pas de pluie prévue";
+  else lead = shown.slice(0, 3).map(p => `${p === shown[0] ? "Pluie" : "puis pluie"} ${RAIN_LV[p.max].word} de ${fmtH(Math.max(p.from, label === "Aujourd'hui" ? Math.floor(now / 3600000) * 3600000 : p.from))} à ${fmtH(p.to)}`).join(", ");
+  const total = hours.filter(x => !isPast ? !x.past : true).reduce((a, x) => a + x.mm, 0);
+
+  const W = 340, top = 6, barH = 34, n = hours.length, cw = W / n;
+  const X = ms => (ms - start) / (end - start) * W;
+  const cells = hours.map((x, i) => `<rect x="${(i * cw + 0.5).toFixed(1)}" y="${top}" width="${(cw - 1).toFixed(1)}" height="${barH}" rx="3" fill="${RAIN_LV[x.lv].col}" ${x.past && !isPast ? 'opacity="0.35"' : ""}/>`).join("");
+  // petites gouttes : hauteur proportionnelle à la quantité
+  const drops = hours.map((x, i) => x.mm >= 0.1 ? `<rect x="${(i * cw + cw / 2 - 1.5).toFixed(1)}" y="${(top + barH + 4).toFixed(1)}" width="3" height="${Math.min(14, 2 + x.mm * 4).toFixed(1)}" rx="1.5" fill="#5BB8FF" ${x.past && !isPast ? 'opacity="0.35"' : ""}/>` : "").join("");
+  const ticks = [0, 6, 12, 18, 24].map(k => `<text x="${(k / 24 * W).toFixed(1)}" y="${top + barH + 32}" text-anchor="${k === 0 ? "start" : k === 24 ? "end" : "middle"}" fill="#9AA8C2" font-size="11" font-weight="600">${k}h</text>`).join("");
+  const nowLine = !isPast && now > start && now < end ? `<line x1="${X(now).toFixed(1)}" x2="${X(now).toFixed(1)}" y1="1" y2="${top + barH + 5}" stroke="#EAF0FA" stroke-width="2"/><text x="${X(now).toFixed(1)}" y="${top + barH + 32}" text-anchor="middle" fill="#EAF0FA" font-size="11" font-weight="800">${X(now) > 30 && X(now) < W - 30 ? "maint." : ""}</text>` : "";
+  return `
+    <section class="card" aria-label="Pluie sur la journée" style="margin-top:16px;gap:10px">
+      <div class="card-head"><h2>${isPast ? "La pluie d'hier" : "Pluie dans la journée"}</h2><span class="sub">${total >= 0.1 ? nf(total, 1) + " mm" : "0 mm"}${isPast ? "" : " prévus"}</span></div>
+      <p style="font-size:17px;font-weight:800;line-height:1.3">${lead}.</p>
+      <svg class="chart" viewBox="0 0 ${W} ${top + barH + 36}" role="img" aria-label="${esc(lead)}">${cells}${drops}${nowLine}${ticks}</svg>
+      <div class="legend">${isPast
+        ? `<span><i style="background:#E8C14A"></i>Quelques gouttes</span><span><i style="background:#FF9A4D"></i>Pluie</span><span><i style="background:#E5484D"></i>Forte pluie</span>`
+        : `<span><i style="background:#E8C14A"></i>Possible</span><span><i style="background:#FF9A4D"></i>Probable</span><span><i style="background:#E5484D"></i>Quasi sûre</span><span><i style="background:#5BB8FF;width:4px"></i>Quantité</span>`}</div>
+    </section>`;
 }
 
 /* ---------- Vigilance tempête (7 jours) ---------- */
