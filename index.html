@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0B1220">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Météo">
+<title>Météo</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="top-row">
+      <button class="loc" id="loc-btn" type="button" aria-label="Changer de lieu">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s7-6.1 7-12a7 7 0 0 0-14 0c0 5.9 7 12 7 12z"/><circle cx="12" cy="10" r="2.5"/></svg>
+        <span id="loc-name">Localisation…</span>
+      </button>
+      <button class="refresh" id="refresh-btn" type="button" aria-label="Actualiser">
+        <span id="updated">—</span>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg>
+      </button>
+    </div>
+    <h1 id="title-date">Météo</h1>
+    <p class="saint" id="saint"></p>
+  </header>
+
+  <nav class="tabs" aria-label="Onglets">
+    <a href="#meteo" data-tab="meteo" style="--c:#5BB8FF">Météo</a>
+    <a href="#modeles" data-tab="modeles" style="--c:#3FD1C2">Modèles</a>
+    <a href="#orages" data-tab="orages" style="--c:#F4C76B">Orages</a>
+    <a href="#soleil" data-tab="soleil" style="--c:#FF9A4D">Soleil</a>
+    <a href="#champis" data-tab="champis" style="--c:#C9935A">Champis</a>
+  </nav>
+
+  <main>
+    <section class="tab" id="tab-meteo" hidden></section>
+    <section class="tab" id="tab-modeles" hidden></section>
+    <section class="tab" id="tab-orages" hidden></section>
+    <section class="tab" id="tab-soleil" hidden></section>
+    <section class="tab" id="tab-champis" hidden></section>
+  </main>
+
+  <footer class="foot" id="foot"></footer>
+</div>
+
+<dialog id="loc-dialog">
+  <form method="dialog" class="loc-form">
+    <h2>Choisir le lieu</h2>
+    <button type="button" class="btn primary" id="use-gps">Utiliser ma position</button>
+    <label for="city-input">Ou chercher une ville</label>
+    <input id="city-input" type="search" placeholder="Rennes, Saint-Malo…" autocomplete="off">
+    <ul id="city-results" class="city-results"></ul>
+    <button class="btn" value="cancel">Fermer</button>
+  </form>
+</dialog>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
