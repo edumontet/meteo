@@ -201,14 +201,7 @@ function liveMap(body, place, mode) {
 
   const map = L.map(body.querySelector("#radar-map"), { zoomControl: true, attributionControl: true, minZoom: 4, maxZoom: 11 });
   map.fitBounds(FRANCE);
-  L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png", {
-    maxZoom: 11, subdomains: "abcd", attribution: "© OpenStreetMap, © CARTO"
-  }).addTo(map);
-  // Les noms de villes passent au-dessus de la pluie et des nuages.
-  map.createPane("labels"); map.getPane("labels").style.zIndex = 650; map.getPane("labels").style.pointerEvents = "none";
-  L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png", {
-    maxZoom: 11, subdomains: "abcd", pane: "labels"
-  }).addTo(map);
+  baseMap(map);
   L.circleMarker([place.lat, place.lon], { radius: 7, color: "#0B1220", weight: 2, fillColor: "#F4C76B", fillOpacity: 1, pane: "markerPane" })
     .bindTooltip(esc(place.name), { permanent: true, direction: "right", offset: [8, 0], className: "me-tip" }).addTo(map);
   body.querySelector("#go-me").addEventListener("click", () => map.setView([place.lat, place.lon], 8));
@@ -250,6 +243,27 @@ function liveMap(body, place, mode) {
     showFrame(frames.length - 1);
   }).catch(() => { badge.textContent = "Radar indisponible pour le moment"; });
   return () => { alive = false; clearInterval(timer); map.remove(); };
+}
+
+// Fond de carte bien lisible (terres, côtes, frontières, villes) : CARTO éclairci, OpenStreetMap en secours.
+function baseMap(map) {
+  const carto = L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+    maxZoom: 11, subdomains: "abcd", attribution: "© OpenStreetMap, © CARTO", className: "base-tiles", zIndex: 0
+  }).addTo(map);
+  let errors = 0, swapped = false;
+  carto.on("tileerror", () => {
+    if (swapped || ++errors < 3) return;
+    swapped = true;
+    map.removeLayer(carto);
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 11, attribution: "© OpenStreetMap", className: "base-tiles osm-dark", zIndex: 0
+    }).addTo(map);
+  });
+  // Frontière de la France tracée par-dessus, pour qu'elle se voie même sous la pluie.
+  getJSON("https://cdn.jsdelivr.net/gh/gregoiredavid/france-geojson@master/metropole-version-simplifiee.geojson").then(g => {
+    if (!map.getContainer().isConnected) return;
+    L.geoJSON(g, { interactive: false, style: { color: "#C9D3E6", weight: 1.5, opacity: 0.8, fill: false } }).addTo(map);
+  }).catch(() => {});
 }
 
 // Satellite Meteosat (EUMETSAT, WMS public sans clé) : MTG d'abord, ancienne génération MSG en secours.
