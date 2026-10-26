@@ -236,3 +236,4 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.6); }
 .loc-form input { font: inherit; font-size: 16px; background: var(--card2); color: var(--text); border: 1px solid var(--line2); border-radius: 12px; padding: 12px; }
 .city-results { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
 .city-results button { width: 100%; text-align: left; background: var(--card2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; min-height: 44px; font-size: 14px; cursor: pointer; }
+.map-badge.future { background: rgba(91, 184, 255, 0.92); color: #0B1220; }

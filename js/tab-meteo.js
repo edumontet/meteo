@@ -16,10 +16,10 @@ export async function render(el, { place }) {
   renderRadar(el.querySelector("#m-radar"), place);
 
   const url = `https://api.open-meteo.com/v1/forecast?latitude=${place.lat}&longitude=${place.lon}` +
-    `&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,snowfall_sum,precipitation_probability_max,wind_gusts_10m_max` +
+    `&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,snowfall_sum,precipitation_probability_max,wind_gusts_10m_max,wind_speed_10m_max` +
     `&minutely_15=precipitation&past_minutely_15=2&forecast_minutely_15=10` +
     `&current=temperature_2m,weather_code` +
-    `&timezone=Europe%2FParis&past_days=1&forecast_days=2&timeformat=unixtime`;
+    `&timezone=Europe%2FParis&past_days=1&forecast_days=7&timeformat=unixtime`;
   let data;
   try {
     data = await getJSON(url);
@@ -62,6 +62,7 @@ function renderDays(box, data) {
             <span class="mm"><span class="cold">${nf(x.min)}°</span> <span style="color:#9AA8C2">/</span> <span class="warm">${nf(x.max)}°</span></span>
           </button>`).join("")}
       </div>
+      ${stormBox(d)}
       <section class="card" style="margin-top:16px">
         <div class="card-head"><h2>${s.label}</h2><span class="sub">${dayShort(s.date)}</span></div>
         <p class="txt">${esc(s.txt)}${s.label === "Aujourd'hui" && data.current ? ` · ${nf(data.current.temperature_2m)}° en ce moment` : ""}</p>
@@ -75,6 +76,61 @@ function renderDays(box, data) {
     box.querySelectorAll(".day").forEach(b => b.addEventListener("click", () => { sel = +b.dataset.i; draw(); }));
   };
   draw();
+}
+
+/* ---------- Vigilance tempête (7 jours) ---------- */
+// Seuils sur les rafales max du jour : 65 vent fort, 80 coup de vent, 100 tempête.
+const STORM = [
+  { min: 0, word: "Calme", col: "#4CC38A", bg: "#10291F", line: "#1E5A3E" },
+  { min: 65, word: "Vent fort", col: "#E8C14A", bg: "#2A2410", line: "#5A4A1E" },
+  { min: 80, word: "Coup de vent", col: "#FF9A4D", bg: "#2E1C10", line: "#6B3E1E" },
+  { min: 100, word: "Tempête", col: "#E5484D", bg: "#2B1416", line: "#6B2A2E" }
+];
+const stormLevel = g => g >= 100 ? 3 : g >= 80 ? 2 : g >= 65 ? 1 : 0;
+
+function stormBox(d) {
+  const g = d.wind_gusts_10m_max;
+  if (!g) return "";
+  const days = d.time.slice(1, 8).map((t, k) => ({ date: new Date(t * 1000), gust: g[k + 1], wind: d.wind_speed_10m_max?.[k + 1], n: k }))
+    .filter(x => x.gust != null);
+  if (!days.length) return "";
+  const lvl = Math.max(...days.map(x => stormLevel(x.gust)));
+  const first = days.find(x => stormLevel(x.gust) === lvl);
+  const peak = days.reduce((a, x) => x.gust > a.gust ? x : a, days[0]);
+  const S = STORM[lvl];
+  const when = x => x.n === 0 ? "aujourd'hui" : x.n === 1 ? "demain" : `dans ${x.n} jours (${x.date.toLocaleDateString("fr-FR", { weekday: "long", timeZone: "Europe/Paris" })})`;
+  let title, sub;
+  if (lvl === 0) {
+    title = "Pas de tempête prévue d'ici 7 jours";
+    sub = `Rafales max ${nf(peak.gust)} km/h ${when(peak)}.`;
+  } else {
+    const what = lvl === 3 ? (first.n <= 1 ? "Avis de tempête" : "Risque de tempête") : lvl === 2 ? (first.n <= 1 ? "Coup de vent" : "Risque de coup de vent") : "Vent fort";
+    title = `${what} ${when(first)}`;
+    sub = `Rafales jusqu'à ${nf(first.gust)} km/h${first.wind != null ? `, vent moyen ${nf(first.wind)} km/h` : ""}.` + (first.n >= 3 ? " Prévision lointaine, à confirmer dans les prochains jours." : "");
+  }
+  const cells = days.map(x => {
+    const c = STORM[stormLevel(x.gust)].col;
+    return `<div style="display:flex;flex-direction:column;align-items:center;gap:3px">
+      <span style="font-size:11px;color:#9AA8C2;font-weight:${x.n === 0 ? 800 : 600}">${x.n === 0 ? "Auj." : weekdayLetter(x.date)}</span>
+      <span style="width:100%;height:6px;border-radius:3px;background:${c}"></span>
+      <span style="font-size:12px;font-weight:800;color:${stormLevel(x.gust) ? c : "#C9D3E6"}">${nf(x.gust)}</span></div>`;
+  }).join("");
+  return `
+    <section aria-label="Vigilance tempête" style="margin-top:16px;background:${S.bg};border:1px solid ${S.line};border-radius:20px;padding:16px;display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;align-items:center;gap:12px">
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="${S.col}" stroke-width="2" stroke-linecap="round" aria-hidden="true" style="flex-shrink:0">
+          <path d="M3 8h11a3 3 0 1 0-3-3M3 12h16a3 3 0 1 1-3 3M3 16h8"/></svg>
+        <div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+          <span style="font-size:17px;font-weight:800;color:${lvl ? S.col : "#EAF0FA"}">${title}</span>
+          <span class="small" style="color:#C9D3E6">${sub}</span>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(${days.length},minmax(0,1fr));gap:6px">${cells}</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+        <span class="small">Rafales max du jour, en km/h</span>
+        <a href="https://vigilance.meteofrance.fr/fr" target="_blank" rel="noopener" style="font-size:13px;font-weight:700">Vigilance officielle ›</a>
+      </div>
+    </section>`;
 }
 
 /* ---------- Pluie dans l'heure ---------- */
@@ -194,12 +250,12 @@ function liveMap(body, place, mode) {
       <button type="button" class="play" id="radar-play" aria-label="Lancer l'animation">${PLAY_SVG}</button>
       <input type="range" id="radar-range" min="0" max="0" value="0" aria-label="Moment affiché">
     </div>
-    <p class="small">Pluie observée la dernière heure (toutes les 10 min). Pince pour zoomer. Pour la suite, regarde « Prévue ».</p>`
+    <p class="small" id="radar-note">Chargement du radar…</p>`
     : `<p class="small">Image satellite infrarouge Meteosat (EUMETSAT), jour et nuit : plus c'est blanc, plus les nuages sont hauts et épais.</p>`}`;
   const badge = body.querySelector("#radar-time");
   if (!window.L) { body.querySelector("#radar-map").innerHTML = errorBox("Carte indisponible."); return () => {}; }
 
-  const map = L.map(body.querySelector("#radar-map"), { zoomControl: true, attributionControl: true, minZoom: 4, maxZoom: 11 });
+  const map = L.map(body.querySelector("#radar-map"), { zoomControl: true, attributionControl: true, minZoom: 4, maxZoom: 13 });
   map.fitBounds(FRANCE);
   baseMap(map);
   L.circleMarker([place.lat, place.lon], { radius: 7, color: "#0B1220", weight: 2, fillColor: "#F4C76B", fillOpacity: 1, pane: "markerPane" })
@@ -213,19 +269,21 @@ function liveMap(body, place, mode) {
     return () => map.remove();
   }
 
-  let frames = [], host = "", layers = {}, idx = 0, timer = null, alive = true;
-  const range = body.querySelector("#radar-range"), play = body.querySelector("#radar-play");
-  // Une couche n'est créée que quand on l'affiche (tuiles de 512 px) : on reste loin de la limite de 100 requêtes/min.
-  const layerFor = i => layers[i] || (layers[i] = L.tileLayer(`${host}${frames[i].path}/512/{z}/{x}/{y}/2/1_1.png`, {
-    tileSize: 512, zoomOffset: -1, maxNativeZoom: 8, maxZoom: 11, opacity: 0, attribution: "Radar © RainViewer"
+  let frames = [], src = null, base = "", nPast = 0, layers = {}, idx = 0, timer = null, alive = true;
+  const range = body.querySelector("#radar-range"), play = body.querySelector("#radar-play"), note = body.querySelector("#radar-note");
+  // Une couche n'est créée que quand on l'affiche (tuiles de 512 px) : peu de requêtes.
+  const layerFor = i => layers[i] || (layers[i] = L.tileLayer(`${base}${frames[i].path}/512/{z}/{x}/{y}/2/1_1.png`, {
+    tileSize: 512, zoomOffset: -1, maxNativeZoom: src.native, maxZoom: 13, opacity: 0, attribution: src.attribution
   }).addTo(map));
   const showFrame = i => {
     if (!frames.length) return;
     if (layers[idx]) layers[idx].setOpacity(0);
-    idx = i; layerFor(idx).setOpacity(0.85);
+    idx = i; layerFor(idx).setOpacity(0.75);
     if (idx + 1 < frames.length) layerFor(idx + 1); // préchargement de l'image suivante
     range.value = idx;
-    badge.textContent = hm(new Date(frames[idx].time * 1000)) + (idx === frames.length - 1 ? " · dernière image" : "");
+    const fut = idx >= nPast, ahead = Math.round((frames[idx].time * 1000 - Date.now()) / 60000);
+    badge.textContent = hm(new Date(frames[idx].time * 1000)) + (fut ? ` · prévision${ahead > 0 ? " +" + ahead + " min" : ""}` : idx === nPast - 1 ? " · dernière image" : " · observé");
+    badge.classList.toggle("future", fut);
   };
   const stop = () => { clearInterval(timer); timer = null; play.innerHTML = PLAY_SVG; play.setAttribute("aria-label", "Lancer l'animation"); };
   const start = () => {
@@ -234,35 +292,51 @@ function liveMap(body, place, mode) {
   };
   play.addEventListener("click", () => timer ? stop() : start());
   range.addEventListener("input", () => { stop(); showFrame(+range.value); });
-  getJSON("https://api.rainviewer.com/public/weather-maps.json").then(j => {
-    if (!alive) return;
-    host = j.host;
-    frames = (j.radar?.past || []).slice(-7); // la dernière heure
-    if (!frames.length) throw new Error("aucune image");
-    range.max = frames.length - 1;
-    showFrame(frames.length - 1);
-  }).catch(() => { badge.textContent = "Radar indisponible pour le moment"; });
+  // 1) LibreWXR : radar européen EUMETNET OPERA, zoom fin (jusqu'à la ville) et prévision à 1 h.
+  // 2) Secours : RainViewer (zoom limité, sans prévision).
+  const SOURCES = [
+    { json: "https://api.librewxr.net/public/weather-maps.json", base: () => "https://api.librewxr.net", native: 12, keep: 7,
+      attribution: 'Radar <a href="https://librewxr.net" target="_blank" rel="noopener">LibreWXR</a> (EUMETNET OPERA)' },
+    { json: "https://api.rainviewer.com/public/weather-maps.json", base: j => j.host, native: 7, keep: 7,
+      attribution: 'Radar © <a href="https://www.rainviewer.com" target="_blank" rel="noopener">RainViewer</a>' }
+  ];
+  (async () => {
+    for (const s of SOURCES) {
+      try {
+        const j = await getJSON(s.json, { timeout: 8000 });
+        const past = (j.radar?.past || []).slice(-s.keep), next = j.radar?.nowcast || [];
+        if (!past.length) continue;
+        if (!alive) return;
+        src = s; base = s.base(j); frames = [...past, ...next]; nPast = past.length;
+        range.max = frames.length - 1;
+        showFrame(nPast - 1);
+        note.textContent = next.length
+          ? `Pluie observée la dernière heure, puis prévue sur ${Math.round((next[next.length - 1].time - past[past.length - 1].time) / 60)} min (heure sur fond bleu). Pince pour zoomer jusqu'à ta ville.`
+          : "Pluie observée la dernière heure (toutes les 10 min). Pince pour zoomer. Pour la suite, regarde « Prévue ».";
+        return;
+      } catch { /* source suivante */ }
+    }
+    badge.textContent = "Radar indisponible pour le moment";
+  })();
   return () => { alive = false; clearInterval(timer); map.remove(); };
 }
 
 // Fond de carte bien lisible (terres, côtes, frontières, villes) : CARTO éclairci, OpenStreetMap en secours.
 function baseMap(map) {
-  const carto = L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
-    maxZoom: 11, subdomains: "abcd", attribution: "© OpenStreetMap, © CARTO", className: "base-tiles", zIndex: 0
+  const carto = L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
+    maxZoom: 19, subdomains: "abcd", attribution: "© OpenStreetMap, © CARTO", zIndex: 0
   }).addTo(map);
   let errors = 0, swapped = false;
   carto.on("tileerror", () => {
     if (swapped || ++errors < 3) return;
     swapped = true;
     map.removeLayer(carto);
-    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: 11, attribution: "© OpenStreetMap", className: "base-tiles osm-dark", zIndex: 0
-    }).addTo(map);
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap", zIndex: 0 }).addTo(map);
   });
   // Frontière de la France tracée par-dessus, pour qu'elle se voie même sous la pluie.
   getJSON("https://cdn.jsdelivr.net/gh/gregoiredavid/france-geojson@master/metropole-version-simplifiee.geojson").then(g => {
     if (!map.getContainer().isConnected) return;
-    L.geoJSON(g, { interactive: false, style: { color: "#C9D3E6", weight: 1.5, opacity: 0.8, fill: false } }).addTo(map);
+    L.geoJSON(g, { interactive: false, style: { color: "#5A6B8C", weight: 1.5, opacity: 0.7, fill: false } }).addTo(map);
   }).catch(() => {});
 }
 
