@@ -6,9 +6,12 @@ import { getJSON, hm, esc, errorBox } from "./util.js";
 const PLAY = `<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4l13 8-13 8z" fill="#0B1220"/></svg>`;
 const PAUSE = `<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h4v16H6zM14 4h4v16h-4z" fill="#0B1220"/></svg>`;
 
-// Grille : 13 × 13 points, environ 270 km de côté
-const ROWS = 13, COLS = 13, DLAT = 0.2, DLON = 0.3;
-const cache = new Map(); // lieu -> { t, data }
+// Grille fixe sur toute la France et ses abords (Manche, Atlantique, Méditerranée) :
+// 19 × 21 points (environ 65 km entre deux points), lissés à l'affichage.
+// 399 points = 399 « appels » Open-Meteo, sous la limite gratuite de 600 par minute ; gardé 30 min en mémoire.
+const N = 51.8, W0 = -5.6, ROWS = 19, COLS = 21, DLAT = 0.6, DLON = 0.8;
+const FRANCE_BOUNDS = [[W0, N - (ROWS - 1) * DLAT], [W0 + (COLS - 1) * DLON, N]]; // [sud-ouest, nord-est] en lon/lat
+let cache = null; // { t, data }
 
 const MODES = {
   rain: {
@@ -20,7 +23,7 @@ const MODES = {
   clouds: {
     label: "Nuages", unit: "%",
     stops: [[10, [60, 72, 95, 0.0]], [40, [60, 72, 95, 0.28]], [70, [60, 72, 95, 0.48]], [100, [55, 65, 88, 0.66]]],
-    legend: [["Peu", "rgba(60,72,95,0.25)"], ["Moyen", "rgba(60,72,95,0.5)"], ["Couvert", "rgba(55,65,88,0.75)"]],
+    legend: [["Peu", "#B4BDA8"], ["Moyen", "#8E9590"], ["Couvert", "#6A7180"]],
     note: "Couverture nuageuse prévue : plus c'est foncé, plus le ciel est couvert."
   },
   wind: {
@@ -42,43 +45,52 @@ function colorAt(stops, v) {
   return stops[stops.length - 1][1];
 }
 
-async function loadGrid(place) {
-  const key = place.lat + "," + place.lon;
-  const hit = cache.get(key);
-  if (hit && Date.now() - hit.t < 30 * 60000) return hit.data;
-  const lat0 = place.lat + (ROWS - 1) / 2 * DLAT, lon0 = place.lon - (COLS - 1) / 2 * DLON; // coin nord-ouest
-  const lats = [], lons = [];
-  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) { lats.push((lat0 - r * DLAT).toFixed(3)); lons.push((lon0 + c * DLON).toFixed(3)); }
-  const j = await getJSON(`https://api.open-meteo.com/v1/forecast?latitude=${lats.join(",")}&longitude=${lons.join(",")}` +
-    `&hourly=precipitation,cloud_cover,wind_speed_10m,wind_direction_10m&forecast_hours=48&timezone=Europe%2FParis&timeformat=unixtime`, { timeout: 25000 });
-  const arr = Array.isArray(j) ? j : [j];
+async function loadGrid() {
+  if (cache && Date.now() - cache.t < 30 * 60000) return cache.data;
+  const pts = [];
+  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) pts.push([(N - r * DLAT).toFixed(2), (W0 + c * DLON).toFixed(2)]);
+  // Requêtes par paquets de 100 points (adresses pas trop longues), en parallèle
+  const chunks = [];
+  for (let i = 0; i < pts.length; i += 100) chunks.push(pts.slice(i, i + 100));
+  const parts = await Promise.all(chunks.map(ch => getJSON(`https://api.open-meteo.com/v1/forecast?latitude=${ch.map(p => p[0]).join(",")}&longitude=${ch.map(p => p[1]).join(",")}` +
+    `&hourly=precipitation,cloud_cover,wind_speed_10m,wind_direction_10m&forecast_hours=48&timezone=Europe%2FParis&timeformat=unixtime`, { timeout: 30000 })
+    .then(j => Array.isArray(j) ? j : [j])));
+  const arr = parts.flat();
   const times = arr[0].hourly.time;
   const grab = v => times.map((_, h) => Array.from({ length: ROWS }, (_, r) => Array.from({ length: COLS }, (_, c) => arr[r * COLS + c]?.hourly?.[v]?.[h] ?? null)));
   const data = {
-    times, lat0, lon0,
-    bounds: [[lat0 - (ROWS - 1) * DLAT, lon0], [lat0, lon0 + (COLS - 1) * DLON]],
+    times,
     rain: grab("precipitation"), clouds: grab("cloud_cover"), wind: grab("wind_speed_10m"), dir: grab("wind_direction_10m")
   };
-  cache.set(key, { t: Date.now(), data });
+  cache = { t: Date.now(), data };
   return data;
 }
+
+// Projection de Mercator (celle de la carte) : l'image doit suivre la même déformation nord-sud.
+const mercY = lat => Math.log(Math.tan(Math.PI / 4 + lat * Math.PI / 360));
+const latOf = y => Math.atan(Math.sinh(y)) * 180 / Math.PI;
+const Y_N = mercY(N), Y_S = mercY(N - (ROWS - 1) * DLAT);
 
 // Image d'une heure, interpolée entre les points de la grille
 function drawFrame(data, mode, h, canvas) {
   const W = canvas.width, H = canvas.height, ctx = canvas.getContext("2d");
   const grid = data[mode][h], stops = MODES[mode].stops;
   const img = ctx.createImageData(W, H);
+  const rowOfY = [];
+  for (let y = 0; y < H; y++) rowOfY.push((N - latOf(Y_N - y / (H - 1) * (Y_N - Y_S))) / DLAT);
   for (let y = 0; y < H; y++) {
-    const gy = y / (H - 1) * (ROWS - 1), r0 = Math.floor(gy), r1 = Math.min(ROWS - 1, r0 + 1), fy = gy - r0;
+    const gy = rowOfY[y], r0 = Math.floor(gy), r1 = Math.min(ROWS - 1, r0 + 1), fy = gy - r0;
+    const edgeY = Math.min(gy, ROWS - 1 - gy);
     for (let x = 0; x < W; x++) {
       const gx = x / (W - 1) * (COLS - 1), c0 = Math.floor(gx), c1 = Math.min(COLS - 1, c0 + 1), fx = gx - c0;
+      const fade = Math.min(1, Math.min(edgeY, gx, COLS - 1 - gx) / 1.5); // bords fondus, pas de cadre net
       const a = grid[r0][c0], b = grid[r0][c1], c = grid[r1][c0], d = grid[r1][c1];
       if (a == null || b == null || c == null || d == null) continue;
       const v = (a * (1 - fx) + b * fx) * (1 - fy) + (c * (1 - fx) + d * fx) * fy;
       const col = colorAt(stops, v);
       if (!col) continue;
       const i = (y * W + x) * 4;
-      img.data[i] = col[0]; img.data[i + 1] = col[1]; img.data[i + 2] = col[2]; img.data[i + 3] = col[3] * 255;
+      img.data[i] = col[0]; img.data[i + 1] = col[1]; img.data[i + 2] = col[2]; img.data[i + 3] = col[3] * 255 * fade;
     }
   }
   ctx.putImageData(img, 0, 0);
@@ -88,7 +100,8 @@ function drawFrame(data, mode, h, canvas) {
     for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
       const dg = dirs[r][c]; if (dg == null) continue;
       const ang = (dg + 180) * Math.PI / 180; // direction vers laquelle souffle le vent
-      const cx = c / (COLS - 1) * (W - 1), cy = r / (ROWS - 1) * (H - 1), L = 5;
+      if (r === 0 || c === 0 || r === ROWS - 1 || c === COLS - 1) continue;
+      const cx = c / (COLS - 1) * (W - 1), cy = (Y_N - mercY(N - r * DLAT)) / (Y_N - Y_S) * (H - 1), L = 6;
       const dx = Math.sin(ang) * L, dy = -Math.cos(ang) * L;
       ctx.beginPath(); ctx.moveTo(cx - dx, cy - dy); ctx.lineTo(cx + dx, cy + dy); ctx.stroke();
       ctx.beginPath();
@@ -163,7 +176,7 @@ export function forecastMap(box, place) {
         <button type="button" id="fm-me" aria-label="Centrer sur ${esc(place.name)}">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
         </button>
-        <button type="button" id="fm-zone" aria-label="Voir la région">
+        <button type="button" id="fm-zone" aria-label="Voir toute la France">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
         </button>
       </div>
@@ -181,7 +194,7 @@ export function forecastMap(box, place) {
   const $ = s => box.querySelector(s);
   const badge = $("#fm-time"), range = $("#fm-range"), play = $("#fm-play"), legend = $("#fm-legend"), note = $("#fm-note"), ticks = $("#fm-ticks");
   let map = null, mode = "radar", grid = null, radar = null, idx = 0, timer = null, alive = true, ready = false;
-  const canvas = document.createElement("canvas"); canvas.width = 360; canvas.height = 360;
+  const canvas = document.createElement("canvas"); canvas.width = 480; canvas.height = 480;
   const frames = {};
   let firstLabel; // les couches météo passent sous les noms de villes
 
@@ -203,7 +216,7 @@ export function forecastMap(box, place) {
     const k = mode + i;
     const url = frames[k] || (frames[k] = drawFrame(grid, mode, i, canvas));
     const src = map.getSource("fc");
-    const [[s, w], [n, e]] = grid.bounds;
+    const [[w, s], [e, n]] = FRANCE_BOUNDS;
     const coords = [[w, n], [e, n], [e, s], [w, s]];
     if (!src) {
       map.addSource("fc", { type: "image", url, coordinates: coords });
@@ -266,7 +279,7 @@ export function forecastMap(box, place) {
     }
     const m = MODES[mode];
     legend.innerHTML = `<span style="font-weight:700">${m.unit}</span>` + m.legend.map(([t, c]) => `<span><i style="background:${c}"></i>${t}</span>`).join("");
-    note.textContent = m.note + " Zone d'environ 250 km autour de toi.";
+    note.textContent = m.note + " Toute la France : pince pour zoomer.";
   }
 
   async function pick(v) {
@@ -281,7 +294,7 @@ export function forecastMap(box, place) {
     if (v === "radar") return loadRadar();
     if (!grid) {
       badge.textContent = "Chargement des prévisions…";
-      try { grid = await loadGrid(place); } catch { badge.textContent = "Prévisions indisponibles"; return; }
+      try { grid = await loadGrid(); } catch { badge.textContent = "Prévisions indisponibles"; return; }
       if (!alive || mode !== v) return;
     }
     range.max = grid.times.length - 1;
@@ -306,7 +319,7 @@ export function forecastMap(box, place) {
       const dot = document.createElement("div"); dot.className = "me-dot";
       new maplibregl.Marker({ element: dot }).setLngLat([place.lon, place.lat]).addTo(map);
       $("#fm-me").addEventListener("click", () => map.easeTo({ center: [place.lon, place.lat], zoom: 9 }));
-      $("#fm-zone").addEventListener("click", () => map.easeTo({ center: [place.lon, place.lat], zoom: 6.5 }));
+      $("#fm-zone").addEventListener("click", () => map.fitBounds([[-5, 41.3], [9.6, 51.2]], { padding: 10 }));
       map.on("load", () => {
         firstLabel = map.getStyle().layers.find(l => l.type === "symbol")?.id;
         ready = true;
