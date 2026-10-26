@@ -17,7 +17,7 @@ Web app météo pour iPhone, en français, sans installation ni compte : une pag
 3. L'appli est en ligne au bout d'une minute à l'adresse `https://edumontet.github.io/meteo/`.
 4. Sur l'iPhone, ouvre l'adresse, touche **Partager** puis **Sur l'écran d'accueil**.
 
-Le lieu suit ta position GPS (Rennes par défaut). Touche le nom du lieu en haut pour en choisir un autre. Touche l'heure en haut à droite pour actualiser.
+Le lieu suit ta position GPS (Rennes par défaut). Touche le nom du lieu en haut pour en choisir un autre. Tire la page vers le bas (ou touche l'heure en haut à droite) pour actualiser.
 
 ## Sources de données
 

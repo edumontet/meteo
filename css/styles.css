@@ -30,6 +30,18 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 button { font-family: inherit; color: inherit; }
+html, body { overscroll-behavior-y: contain; }
+
+/* Tirer pour actualiser */
+.ptr {
+  position: fixed; left: 50%; top: calc(var(--safe-top) + 8px); z-index: 2000;
+  width: 40px; height: 40px; border-radius: 999px; background: var(--card2, #141E33); border: 1px solid #2F4466;
+  color: var(--muted, #9AA8C2); display: flex; align-items: center; justify-content: center;
+  transform: translate(-50%, -50px); opacity: 0; pointer-events: none;
+}
+.ptr.ready, .ptr.spin { color: var(--blue); }
+.ptr.spin svg { animation: ptr-spin .8s linear infinite; }
+@keyframes ptr-spin { to { transform: rotate(360deg); } }
 h1, h2, h3, p { margin: 0; }
 a { color: var(--blue); }
 

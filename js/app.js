@@ -91,8 +91,50 @@ async function show(name) {
 
 function refresh() {
   setHeader();
-  state.rendered = {};
-  show(currentTab());
+  state.lastRefresh = Date.now();
+  state.rendered = {}; // les autres onglets se rechargeront quand on les ouvrira
+  return show(currentTab());
+}
+
+/* Tirer vers le bas pour actualiser (quand on est tout en haut de la page). */
+function pullToRefresh() {
+  const ptr = document.createElement("div");
+  ptr.className = "ptr";
+  ptr.setAttribute("aria-hidden", "true");
+  ptr.innerHTML = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg>`;
+  document.body.appendChild(ptr);
+  const LIMIT = 75;
+  let y0 = null, dy = 0, busy = false;
+  // Pas de geste sur les cartes, curseurs et iframes : là, le doigt sert à déplacer ou zoomer.
+  const blocked = t => t.closest && t.closest(".map, .leaflet-container, iframe, input, .frame");
+  const set = (d, anim) => {
+    ptr.style.transition = anim ? "transform .25s, opacity .25s" : "none";
+    ptr.style.transform = `translate(-50%, ${Math.min(d, LIMIT + 20) - 50}px) rotate(${d * 3}deg)`;
+    ptr.style.opacity = Math.min(d / LIMIT, 1);
+    ptr.classList.toggle("ready", d >= LIMIT);
+  };
+  document.addEventListener("touchstart", e => {
+    if (busy || window.scrollY > 0 || e.touches.length > 1 || blocked(e.target)) { y0 = null; return; }
+    y0 = e.touches[0].clientY; dy = 0;
+  }, { passive: true });
+  document.addEventListener("touchmove", e => {
+    if (y0 === null) return;
+    dy = (e.touches[0].clientY - y0) * 0.5;
+    if (dy <= 0 || window.scrollY > 0) { dy = 0; set(0); return; }
+    if (e.cancelable) e.preventDefault();
+    set(dy);
+  }, { passive: false });
+  document.addEventListener("touchend", async () => {
+    if (y0 === null) return;
+    y0 = null;
+    if (dy < LIMIT) { set(0, true); return; }
+    busy = true;
+    ptr.classList.add("spin");
+    set(LIMIT, true);
+    const t0 = Date.now();
+    try { await refresh(); } catch (e) { console.error(e); }
+    setTimeout(() => { ptr.classList.remove("spin"); set(0, true); busy = false; }, Math.max(0, 600 - (Date.now() - t0)));
+  });
 }
 
 // Choix du lieu
@@ -153,10 +195,11 @@ window.addEventListener("hashchange", () => show(currentTab()));
 document.getElementById("refresh-btn").addEventListener("click", refresh);
 document.addEventListener("visibilitychange", () => {
   // Au retour sur l'appli après plus de 10 minutes, on actualise.
-  if (document.visibilityState === "visible" && Date.now() - (state.lastRefresh || 0) > 10 * 60 * 1000) { state.lastRefresh = Date.now(); refresh(); }
+  if (document.visibilityState === "visible" && Date.now() - (state.lastRefresh || 0) > 10 * 60 * 1000) refresh();
 });
 
 state.lastRefresh = Date.now();
+pullToRefresh();
 setHeader();
 footer();
 setupDialog();
