@@ -1,6 +1,7 @@
 import { getJSON, esc, nf, hm, hmH, dayShort, wmo, icon, barChart, errorBox, inDays, daysBetween, ymd, weekdayLetter, parisMidnight } from "./util.js";
 import { moonInfo, moonSVG } from "./moon.js";
 import { createTidePredictor, stations } from "./tides-engine.js";
+import { forecastMap } from "./forecast-map.js";
 
 export async function render(el, { place }) {
   el.innerHTML = `
@@ -200,164 +201,15 @@ function renderRain(box, data) {
 }
 const cap1 = s => s[0].toUpperCase() + s.slice(1);
 
-/* ---------- Radar ---------- */
-// Une seule carte de France zoomable (Leaflet) pour le radar et les nuages, centrée sur le lieu (Rennes par défaut).
-// Pas de clé d'API : radar RainViewer (offre gratuite : zoom 7 max, schéma « Universal Blue », 100 requêtes/min)
-// et images satellite EUMETSAT (Meteosat). La prévision reste sur Windy.
-const FRANCE = [[41.3, -5.3], [51.2, 9.7]];
-const PLAY_SVG = `<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4l13 8-13 8z" fill="#0B1220"/></svg>`;
-const PAUSE_SVG = `<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h4v16H6zM14 4h4v16h-4z" fill="#0B1220"/></svg>`;
-
+/* ---------- Carte météo (pluie, nuages, vent, radar) ---------- */
 function renderRadar(box, place) {
-  box.innerHTML = `
-    <div class="card-head"><h2>Radar pluie &amp; nuages</h2>
-      <div class="seg" role="group" aria-label="Type de carte">
-        <button type="button" data-v="radar" aria-pressed="true">Radar</button>
-        <button type="button" data-v="clouds" aria-pressed="false">Nuages</button>
-        <button type="button" data-v="rain" aria-pressed="false">Prévue</button>
-      </div>
-    </div>
-    <div id="radar-body"></div>`;
-  const body = box.querySelector("#radar-body");
-  const windy = () => `
-    <iframe class="frame tall" loading="lazy" title="Carte Windy de la pluie prévue"
-      src="https://embed.windy.com/embed.html?type=map&location=coordinates&metricRain=mm&metricTemp=%C2%B0C&metricWind=km%2Fh&zoom=6&overlay=rain&product=ecmwf&level=surface&lat=${place.lat}&lon=${place.lon}&detailLat=${place.lat}&detailLon=${place.lon}&marker=true&message=true"></iframe>
-    <p class="small">Pluie prévue heure par heure : bouton lecture en bas de la carte.</p>`;
-  let cleanup = null;
-  const pick = v => {
-    box.querySelectorAll(".seg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.v === v));
-    if (cleanup) { cleanup(); cleanup = null; }
-    if (v === "rain") body.innerHTML = windy();
-    else cleanup = liveMap(body, place, v);
-  };
-  box.querySelectorAll(".seg button").forEach(b => b.addEventListener("click", () => pick(b.dataset.v)));
-  pick("radar");
-}
-
-function liveMap(body, place, mode) {
-  const isRadar = mode === "radar";
-  body.innerHTML = `
-    <div class="map tall" id="radar-map">
-      <span class="map-badge" id="radar-time">Chargement…</span>
-      <div class="map-btns">
-        <button type="button" id="go-me" aria-label="Centrer sur ${esc(place.name)}">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
-        </button>
-        <button type="button" id="go-fr" aria-label="Voir toute la France">FR</button>
-      </div>
-    </div>
-    ${isRadar ? `<div class="player">
-      <button type="button" class="play" id="radar-play" aria-label="Lancer l'animation">${PLAY_SVG}</button>
-      <input type="range" id="radar-range" min="0" max="0" value="0" aria-label="Moment affiché">
-    </div>
-    <p class="small" id="radar-note">Chargement du radar…</p>`
-    : `<p class="small">Image satellite infrarouge Meteosat (EUMETSAT), jour et nuit : plus c'est blanc, plus les nuages sont hauts et épais.</p>`}`;
-  const badge = body.querySelector("#radar-time");
-  if (!window.L) { body.querySelector("#radar-map").innerHTML = errorBox("Carte indisponible."); return () => {}; }
-
-  const map = L.map(body.querySelector("#radar-map"), { zoomControl: true, attributionControl: true, minZoom: 4, maxZoom: 13 });
-  map.fitBounds(FRANCE);
-  baseMap(map);
-  L.circleMarker([place.lat, place.lon], { radius: 7, color: "#0B1220", weight: 2, fillColor: "#F4C76B", fillOpacity: 1, pane: "markerPane" })
-    .bindTooltip(esc(place.name), { permanent: true, direction: "right", offset: [8, 0], className: "me-tip" }).addTo(map);
-  body.querySelector("#go-me").addEventListener("click", () => map.setView([place.lat, place.lon], 8));
-  body.querySelector("#go-fr").addEventListener("click", () => map.fitBounds(FRANCE));
-  setTimeout(() => { map.invalidateSize(); map.fitBounds(FRANCE); }, 200);
-
-  if (!isRadar) {
-    cloudLayer(map, badge);
-    return () => map.remove();
-  }
-
-  let frames = [], src = null, base = "", nPast = 0, layers = {}, idx = 0, timer = null, alive = true;
-  const range = body.querySelector("#radar-range"), play = body.querySelector("#radar-play"), note = body.querySelector("#radar-note");
-  // Une couche n'est créée que quand on l'affiche (tuiles de 512 px) : peu de requêtes.
-  const layerFor = i => layers[i] || (layers[i] = L.tileLayer(`${base}${frames[i].path}/512/{z}/{x}/{y}/2/1_1.png`, {
-    tileSize: 512, zoomOffset: -1, maxNativeZoom: src.native, maxZoom: 13, opacity: 0, attribution: src.attribution
-  }).addTo(map));
-  const showFrame = i => {
-    if (!frames.length) return;
-    if (layers[idx]) layers[idx].setOpacity(0);
-    idx = i; layerFor(idx).setOpacity(0.75);
-    if (idx + 1 < frames.length) layerFor(idx + 1); // préchargement de l'image suivante
-    range.value = idx;
-    const fut = idx >= nPast, ahead = Math.round((frames[idx].time * 1000 - Date.now()) / 60000);
-    badge.textContent = hm(new Date(frames[idx].time * 1000)) + (fut ? ` · prévision${ahead > 0 ? " +" + ahead + " min" : ""}` : idx === nPast - 1 ? " · dernière image" : " · observé");
-    badge.classList.toggle("future", fut);
-  };
-  const stop = () => { clearInterval(timer); timer = null; play.innerHTML = PLAY_SVG; play.setAttribute("aria-label", "Lancer l'animation"); };
-  const start = () => {
-    timer = setInterval(() => showFrame((idx + 1) % frames.length), 800);
-    play.innerHTML = PAUSE_SVG; play.setAttribute("aria-label", "Mettre en pause");
-  };
-  play.addEventListener("click", () => timer ? stop() : start());
-  range.addEventListener("input", () => { stop(); showFrame(+range.value); });
-  // 1) LibreWXR : radar européen EUMETNET OPERA, zoom fin (jusqu'à la ville) et prévision à 1 h.
-  // 2) Secours : RainViewer (zoom limité, sans prévision).
-  const SOURCES = [
-    { json: "https://api.librewxr.net/public/weather-maps.json", base: () => "https://api.librewxr.net", native: 12, keep: 7,
-      attribution: 'Radar <a href="https://librewxr.net" target="_blank" rel="noopener">LibreWXR</a> (EUMETNET OPERA)' },
-    { json: "https://api.rainviewer.com/public/weather-maps.json", base: j => j.host, native: 7, keep: 7,
-      attribution: 'Radar © <a href="https://www.rainviewer.com" target="_blank" rel="noopener">RainViewer</a>' }
-  ];
-  (async () => {
-    for (const s of SOURCES) {
-      try {
-        const j = await getJSON(s.json, { timeout: 8000 });
-        const past = (j.radar?.past || []).slice(-s.keep), next = j.radar?.nowcast || [];
-        if (!past.length) continue;
-        if (!alive) return;
-        src = s; base = s.base(j); frames = [...past, ...next]; nPast = past.length;
-        range.max = frames.length - 1;
-        showFrame(nPast - 1);
-        note.textContent = next.length
-          ? `Pluie observée la dernière heure, puis prévue sur ${Math.round((next[next.length - 1].time - past[past.length - 1].time) / 60)} min (heure sur fond bleu). Pince pour zoomer jusqu'à ta ville.`
-          : "Pluie observée la dernière heure (toutes les 10 min). Pince pour zoomer. Pour la suite, regarde « Prévue ».";
-        return;
-      } catch { /* source suivante */ }
-    }
-    badge.textContent = "Radar indisponible pour le moment";
-  })();
-  return () => { alive = false; clearInterval(timer); map.remove(); };
-}
-
-// Fond de carte bien lisible (terres, côtes, frontières, villes) : CARTO éclairci, OpenStreetMap en secours.
-function baseMap(map) {
-  const carto = L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
-    maxZoom: 19, subdomains: "abcd", attribution: "© OpenStreetMap, © CARTO", zIndex: 0
-  }).addTo(map);
-  let errors = 0, swapped = false;
-  carto.on("tileerror", () => {
-    if (swapped || ++errors < 3) return;
-    swapped = true;
-    map.removeLayer(carto);
-    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap", zIndex: 0 }).addTo(map);
-  });
-  // Frontière de la France tracée par-dessus, pour qu'elle se voie même sous la pluie.
-  getJSON("https://cdn.jsdelivr.net/gh/gregoiredavid/france-geojson@master/metropole-version-simplifiee.geojson").then(g => {
-    if (!map.getContainer().isConnected) return;
-    L.geoJSON(g, { interactive: false, style: { color: "#5A6B8C", weight: 1.5, opacity: 0.7, fill: false } }).addTo(map);
-  }).catch(() => {});
-}
-
-// Satellite Meteosat (EUMETSAT, WMS public sans clé) : MTG d'abord, ancienne génération MSG en secours.
-function cloudLayer(map, badge) {
-  const sources = ["mtg_fd:ir105_hrfi", "msg_fes:ir108"];
-  let k = 0, layer = null, errors = 0;
-  const load = () => {
-    if (layer) map.removeLayer(layer);
-    errors = 0;
-    layer = L.tileLayer.wms("https://view.eumetsat.int/geoserver/wms", {
-      layers: sources[k], format: "image/png", transparent: true, version: "1.3.0", opacity: 0.75,
-      attribution: "Satellite © EUMETSAT"
-    }).addTo(map);
-    layer.on("tileerror", () => {
-      if (++errors < 3) return;
-      if (k + 1 < sources.length) { k++; load(); } else badge.textContent = "Satellite indisponible pour le moment";
-    });
-    layer.on("load", () => { if (errors < 3) badge.textContent = "Satellite · dernière image"; });
-  };
-  load();
+  forecastMap(box, place);
+  const more = document.createElement("a");
+  more.className = "small"; more.target = "_blank"; more.rel = "noopener";
+  more.href = `https://www.windy.com/?${place.lat},${place.lon},9`;
+  more.textContent = "Ouvrir dans Windy ›";
+  more.style.fontWeight = "700";
+  box.appendChild(more);
 }
 
 /* ---------- Lune ---------- */
