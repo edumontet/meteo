@@ -8,7 +8,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Métro">
-<title>Métro Rennes</title>
+<title>Métro et bus Rennes</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -17,46 +17,93 @@
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="metro.css">
 </head>
-<body>
-<main class="app">
+<body data-tab="metro">
+<div class="app">
   <header class="top">
     <a class="back" href="../">‹ Météo</a>
     <h1>
-      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="3" width="14" height="14" rx="3"/><path d="M5 11h14M9 21l-2 0M15 21h2M8 17l-2 4M16 17l2 4"/><circle cx="9" cy="14" r=".6" fill="currentColor"/><circle cx="15" cy="14" r=".6" fill="currentColor"/></svg>
-      Métro Rennes
+      <svg class="ico-metro" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="3" width="14" height="14" rx="3"/><path d="M5 11h14M8 17l-2 4M16 17l2 4"/><circle cx="9" cy="14" r=".6" fill="currentColor"/><circle cx="15" cy="14" r=".6" fill="currentColor"/></svg>
+      <svg class="ico-bus" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="3" width="16" height="15" rx="3"/><path d="M4 11h16M8 18v3M16 18v3M9 7h6"/><circle cx="8" cy="14.5" r=".6" fill="currentColor"/><circle cx="16" cy="14.5" r=".6" fill="currentColor"/></svg>
+      <span id="title">Métro Rennes</span>
     </h1>
   </header>
 
-  <section class="card">
-    <div class="lbl">Ligne</div>
-    <div class="seg" role="group" aria-label="Ligne">
-      <button type="button" id="btn-a" data-line="A">Ligne A</button>
-      <button type="button" id="btn-b" data-line="B">Ligne B</button>
-    </div>
+  <nav class="tabs" aria-label="Onglets">
+    <a href="#metro" data-tab="metro" style="--c:#E5484D">Métro</a>
+    <a href="#bus" data-tab="bus" style="--c:#5BB8FF">Bus</a>
+  </nav>
 
-    <label class="lbl" for="station">Station</label>
-    <select id="station"></select>
+  <!-- Onglet Métro -->
+  <main class="tab" id="tab-metro">
+    <section class="card">
+      <div class="lbl">Ligne</div>
+      <div class="seg" role="group" aria-label="Ligne">
+        <button type="button" id="btn-a" data-line="A">Ligne A</button>
+        <button type="button" id="btn-b" data-line="B">Ligne B</button>
+      </div>
 
-    <label class="lbl" for="direction">Direction</label>
-    <select id="direction"></select>
-  </section>
+      <label class="lbl" for="station">Station</label>
+      <select id="station"></select>
 
-  <section class="result" id="result" aria-live="polite">
-    <div class="r-label" id="r-label">Prochain métro dans</div>
-    <div class="r-main" id="r-main">…</div>
-    <div class="r-next" id="r-next"></div>
-    <div class="r-note" id="r-note"></div>
-  </section>
+      <label class="lbl" for="direction">Direction</label>
+      <select id="direction"></select>
+    </section>
 
-  <button type="button" class="status" id="status" aria-label="Actualiser">
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg>
-    <span id="status-text">Chargement…</span>
-  </button>
+    <section class="result" id="result" aria-live="polite">
+      <div class="r-label" id="r-label">Prochain métro dans</div>
+      <div class="r-main" id="r-main">…</div>
+      <div class="r-next" id="r-next"></div>
+      <div class="r-note" id="r-note"></div>
+    </section>
 
-  <pre class="debug" id="debug" hidden></pre>
+    <button type="button" class="status" id="status" aria-label="Actualiser">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg>
+      <span id="status-text">Chargement…</span>
+    </button>
+    <pre class="debug" id="debug" hidden></pre>
+  </main>
+
+  <!-- Onglet Bus -->
+  <main class="tab bus" id="tab-bus" hidden>
+    <section class="card">
+      <label class="lbl" for="from">Je pars de</label>
+      <div class="ac">
+        <input id="from" type="text" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="République" enterkeyhint="next">
+        <ul class="sugg" id="from-sugg" hidden></ul>
+      </div>
+
+      <div class="swap-row">
+        <label class="lbl" for="to">Je vais à</label>
+        <button type="button" class="swap" id="swap" aria-label="Inverser départ et arrivée">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4v16M3 8l4-4 4 4M17 20V4M13 16l4 4 4-4"/></svg>
+        </button>
+      </div>
+      <div class="ac">
+        <input id="to" type="text" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="Gares" enterkeyhint="done">
+        <ul class="sugg" id="to-sugg" hidden></ul>
+      </div>
+    </section>
+
+    <section class="result" id="bus-result" aria-live="polite">
+      <div class="r-label" id="b-label"></div>
+      <div class="r-main small" id="b-main">Choisis tes deux arrêts</div>
+      <div class="r-next" id="b-next"></div>
+      <div class="r-note" id="b-note"></div>
+    </section>
+
+    <ul class="blist" id="b-list"></ul>
+
+    <button type="button" class="status" id="b-status" aria-label="Actualiser">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg>
+      <span id="b-status-text">Chargement des arrêts…</span>
+    </button>
+    <pre class="debug" id="b-debug" hidden></pre>
+  </main>
 
   <footer class="foot">Données temps réel : STAR / Rennes Métropole (data.explore.star.fr), licence ODbL.</footer>
-</main>
+</div>
 <script src="metro.js"></script>
+<script src="bus.js"></script>
+<script src="tabs.js"></script>
 </body>
 </html>

@@ -1,7 +1,7 @@
 {
-  "name": "Métro Rennes",
+  "name": "Métro et bus Rennes",
   "short_name": "Métro",
-  "description": "Prochain passage du métro de Rennes (lignes A et B) en temps réel, à la seconde.",
+  "description": "Prochain métro (lignes A et B) et prochain bus entre deux arrêts, en temps réel.",
   "lang": "fr",
   "start_url": "./",
   "scope": "./",

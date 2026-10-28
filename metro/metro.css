@@ -19,6 +19,7 @@
   --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
 body.line-b { --c: var(--b); --c-bg: var(--b-bg); --c-soft: var(--b-soft); }
+body[data-tab="bus"] { --c: #5BB8FF; --c-bg: #0F2A44; --c-soft: #A9D8FF; }
 
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
@@ -30,7 +31,7 @@ body {
   font-variant-numeric: tabular-nums;
   -webkit-font-smoothing: antialiased;
 }
-button, select { font-family: inherit; color: inherit; }
+button, select, input { font-family: inherit; color: inherit; }
 h1 { margin: 0; }
 
 .app {
@@ -88,3 +89,58 @@ select {
 
 .debug { font-size: 11px; color: var(--muted); background: #0F182B; border-radius: 12px; padding: 12px; overflow-x: auto; white-space: pre-wrap; word-break: break-all; }
 .foot { text-align: center; font-size: 11px; color: #6B7894; padding: 0 12px; }
+
+/* Onglets */
+.tabs {
+  position: sticky; top: calc(var(--safe-top) + 6px); z-index: 1000;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 3px;
+  background: rgba(20, 30, 51, 0.92); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--line); border-radius: 999px; padding: 4px;
+}
+.tabs a {
+  display: flex; align-items: center; justify-content: center; min-height: 40px;
+  border-radius: 999px; color: var(--soft); font-size: 14px; font-weight: 700; text-decoration: none;
+}
+.tabs a[aria-current="page"] { background: var(--c); color: var(--bg); font-weight: 800; }
+.tab { display: flex; flex-direction: column; gap: 16px; }
+.tab[hidden] { display: none; }
+.ico-bus { display: none; }
+body[data-tab="bus"] .ico-bus { display: block; }
+body[data-tab="bus"] .ico-metro { display: none; }
+
+/* Bus : choix des arrêts */
+.ac { position: relative; }
+.ac input {
+  width: 100%; height: 50px; border-radius: 12px; border: 1px solid var(--line2);
+  background: #0F182B; font-size: 17px; font-weight: 600; padding: 0 14px; outline: none;
+}
+.ac input:focus { border-color: var(--c); }
+.ac input::placeholder { color: #55617A; font-weight: 500; }
+.sugg {
+  position: absolute; left: 0; right: 0; top: 54px; z-index: 50; margin: 0; padding: 4px; list-style: none;
+  background: #18233B; border: 1px solid var(--line2); border-radius: 12px; max-height: 300px; overflow-y: auto;
+}
+.sugg[hidden] { display: none; }
+.sugg li { padding: 12px 10px; border-radius: 8px; font-size: 16px; font-weight: 600; }
+.sugg li:active, .sugg li.hl { background: #22304D; }
+.swap-row { display: flex; align-items: flex-end; justify-content: space-between; }
+.swap {
+  width: 38px; height: 34px; margin-bottom: 4px; border-radius: 10px; border: 1px solid var(--line2);
+  background: transparent; color: var(--soft); display: flex; align-items: center; justify-content: center;
+}
+
+/* Bus : liste des passages */
+.badge {
+  display: inline-flex; align-items: center; justify-content: center; min-width: 40px; height: 28px; padding: 0 8px;
+  border-radius: 8px; font-size: 15px; font-weight: 800; background: #2A3A5C; color: var(--text);
+}
+.r-head { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 15px; font-weight: 700; color: var(--soft); flex-wrap: wrap; }
+.blist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.blist:empty { display: none; }
+.blist li {
+  display: flex; align-items: center; gap: 12px; background: var(--card); border: 1px solid var(--line);
+  border-radius: 14px; padding: 12px 14px;
+}
+.blist .dest { flex: 1; min-width: 0; font-size: 15px; font-weight: 600; color: var(--soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.blist .when { font-size: 17px; font-weight: 800; white-space: nowrap; }
+.blist .theo { font-size: 11px; color: var(--muted); font-weight: 600; display: block; text-align: right; }

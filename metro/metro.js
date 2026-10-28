@@ -18,7 +18,8 @@ const LINES = {
 const DEFAULT_STATION = { A: "République", B: "Gares" };
 
 const $ = id => document.getElementById(id);
-const debugOn = location.hash === "#debug";
+const debugOn = /[?&]debug/.test(location.search);
+const metroVisible = () => document.visibilityState === "visible" && document.body.dataset.tab !== "bus";
 
 const state = {
   line: "A",
@@ -299,10 +300,11 @@ $("direction").addEventListener("change", e => {
 });
 $("status").addEventListener("click", refresh);
 document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState === "visible" && Date.now() - state.lastOk > 10000) refresh();
+  if (metroVisible() && Date.now() - state.lastOk > 10000) refresh();
 });
 
 setLine(load("line") === "B" ? "B" : "A");
 refresh();
 setInterval(render, 1000);
-setInterval(() => { if (document.visibilityState === "visible") refresh(); }, REFRESH_MS);
+setInterval(() => { if (metroVisible()) refresh(); }, REFRESH_MS);
+window.metroRefresh = () => { if (Date.now() - state.lastOk > 10000) refresh(); };
