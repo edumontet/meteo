@@ -10,6 +10,12 @@ Web app météo pour iPhone, en français, sans installation ni compte : une pag
 - **Soleil** : images du Soleil en direct (NASA SDO), éruptions, indice Kp, chances d'aurores en Bretagne, vent solaire.
 - **Champis** : indice champignons calculé pour ta position (pluie des 15 derniers jours, température et humidité du sol, gel, vent) sur 15 jours, avec la Lune à titre indicatif.
 
+## Métro Rennes
+
+Une deuxième web app vit dans le dossier `metro/`, à l'adresse `https://edumontet.github.io/meteo/metro/` : on choisit la ligne (A ou B), la station et la direction, et elle affiche dans combien de minutes et de secondes arrive la prochaine rame, puis les suivantes. Le choix est mémorisé. Données temps réel du jeu « Prochains passages applicables des lignes de métro du réseau STAR » sur [STAR Data Explore](https://data.explore.star.fr) (licence ODbL), actualisées toutes les 30 s. Ajouter `#debug` à l'adresse affiche les données brutes reçues.
+
+Elle s'installe à part sur l'écran d'accueil (Partager › Sur l'écran d'accueil depuis la page Métro).
+
 ## Mettre en ligne
 
 1. Dans le dépôt GitHub : **Settings › Pages**.
