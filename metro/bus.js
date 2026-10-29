@@ -204,6 +204,7 @@
   }
 
   function render() {
+    if (window.favUpdate) window.favUpdate();
     const label = $("b-label"), main = $("b-main"), next = $("b-next"), note = $("b-note"), list = $("b-list");
     const st = $("b-status"), stText = $("b-status-text");
     const setMsg = (title, sub) => {
@@ -324,6 +325,15 @@
     else if (S.routeError) { S.routeKey = ""; findRoutes(); }
     else refresh();
   });
+
+  // Pour les favoris
+  window.busGet = () => ({ from: S.from, to: S.to, routes: S.routes, lines: S.lines });
+  window.busSet = (from, to) => {
+    S.from = from; S.to = to;
+    $("from").value = from; $("to").value = to;
+    store("from", from); store("to", to);
+    if (!started) start(); else findRoutes();
+  };
 
   const busVisible = () => document.visibilityState === "visible" && document.body.dataset.tab === "bus";
   window.busShown = () => {

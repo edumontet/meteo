@@ -145,3 +145,37 @@ body[data-tab="bus"] .ico-metro { display: none; }
 .blist .when { font-size: 17px; font-weight: 800; white-space: nowrap; }
 .blist .theo { font-size: 11px; color: var(--muted); font-weight: 600; display: block; text-align: right; }
 .top-links { display: flex; justify-content: space-between; }
+
+/* Favoris */
+.favs { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+.favs-head { display: flex; align-items: center; justify-content: space-between; }
+.favs-title { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; color: #F4C76B; }
+.favs-edit { background: none; border: 0; font-size: 13px; font-weight: 700; color: var(--muted); padding: 4px 2px; }
+.favs-empty { margin: 0; font-size: 12px; line-height: 1.45; color: var(--muted); }
+.favs-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.favs-list li { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-top: 1px solid var(--line); cursor: pointer; }
+.favs-list li:first-child { border-top: 0; }
+.favs-list li.on .f-name { color: #fff; }
+.f-tag {
+  flex: none; min-width: 34px; height: 26px; padding: 0 6px; border-radius: 7px; display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 800;
+}
+.f-tag.metro-a { background: var(--a); color: #fff; }
+.f-tag.metro-b { background: var(--b); color: #0B1220; }
+.f-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.f-name { font-size: 14px; font-weight: 700; color: var(--soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.f-sub { font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.f-when { flex: none; text-align: right; font-size: 16px; font-weight: 800; white-space: nowrap; }
+.f-when.soon { color: #F4C76B; }
+.f-when.none { font-size: 12px; font-weight: 600; color: var(--muted); }
+.f-del { flex: none; width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--line2); background: none; color: var(--a-soft); font-size: 18px; line-height: 1; }
+.favs.editing .f-when { display: none; }
+.favs:not(.editing) .f-del { display: none; }
+
+.fav-btn {
+  align-self: center; display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 16px; border-radius: 999px;
+  border: 1px solid var(--line2); background: transparent; font-size: 14px; font-weight: 700; color: var(--soft);
+}
+.fav-btn.saved { color: #F4C76B; border-color: #6B5626; }
+.fav-btn.saved svg { fill: currentColor; }
+.fav-btn[hidden] { display: none; }

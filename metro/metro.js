@@ -290,6 +290,8 @@ function render() {
   bits.push("arrivée prévue " + hhmm(first.time).slice(0, 5));
   note.textContent = bits.join(" · ");
 }
+const _render = render;
+render = function () { _render(); if (window.favUpdate) window.favUpdate(); };
 
 // ---------- Démarrage ----------
 $("btn-a").addEventListener("click", () => setLine("A"));
@@ -314,3 +316,11 @@ refresh();
 setInterval(render, 1000);
 setInterval(() => { if (metroVisible()) refresh(); }, REFRESH_MS);
 window.metroRefresh = () => { if (Date.now() - state.lastOk > 10000) refresh(); };
+// Pour les favoris
+window.metroGet = () => ({ line: state.line, station: state.station, dir: state.dir });
+window.metroSet = (line, station, dir) => {
+  store("station." + line, station);
+  store("dir." + line, dir);
+  setLine(line);
+  window.metroRefresh();
+};
