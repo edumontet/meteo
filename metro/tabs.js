@@ -4,9 +4,7 @@
   const TITLES = { metro: "Métro Rennes", bus: "Bus Rennes" };
   function current() {
     const h = location.hash.replace("#", "");
-    if (TITLES[h]) return h;
-    try { const s = localStorage.getItem("metro.tab"); if (TITLES[s]) return s; } catch (e) {}
-    return "metro";
+    return TITLES[h] ? h : "metro";
   }
   function show(tab) {
     document.body.dataset.tab = tab;

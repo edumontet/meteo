@@ -226,6 +226,7 @@ function animate() {
     if (k >= 1) v.to = null;
   }
   requestAnimationFrame(animate);
+  startLocation();
 }
 
 // ---------- Bus ----------
@@ -374,6 +375,30 @@ function renderTrains() {
   $("n-metro").textContent = S.metroOk ? S.trains.size : "–";
 }
 const now0 = t => t.eta && t.eta <= Date.now();
+
+// ---------- Ma position ----------
+// Point bleu qui clignote, cercle de précision, et bouton pour recentrer la carte dessus.
+const me = { marker: null, circle: null, pos: null, centered: false };
+const meIcon = L.divIcon({ className: "me-icon", iconSize: [22, 22], html: '<div class="me"><span class="me-ring"></span><span class="me-ring r2"></span><span class="me-dot"></span></div>' });
+function startLocation() {
+  if (!navigator.geolocation) return;
+  navigator.geolocation.watchPosition(p => {
+    const ll = [p.coords.latitude, p.coords.longitude];
+    me.pos = ll;
+    if (!me.marker) {
+      map.createPane("me").style.zIndex = 650;
+      me.circle = L.circle(ll, { pane: "me", radius: p.coords.accuracy, color: "#1E7BFF", weight: 1, fillColor: "#1E7BFF", fillOpacity: 0.08, interactive: false }).addTo(map);
+      me.marker = L.marker(ll, { pane: "me", icon: meIcon, keyboard: false, interactive: false }).addTo(map);
+      $("locate").hidden = false;
+    } else {
+      me.marker.setLatLng(ll);
+      me.circle.setLatLng(ll).setRadius(p.coords.accuracy);
+    }
+    // Premier point : on centre la carte dessus si on est dans la métropole
+    if (!me.centered && map.getBounds().pad(1).contains(ll)) { me.centered = true; map.setView(ll, Math.max(map.getZoom(), 15)); }
+  }, () => {}, { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 });
+}
+$("locate").addEventListener("click", () => { if (me.pos) map.setView(me.pos, Math.max(map.getZoom(), 16)); });
 
 // ---------- Panneau ----------
 function updatePanel() {

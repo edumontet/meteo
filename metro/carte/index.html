@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
-<link rel="stylesheet" href="carte.css?v=5">
+<link rel="stylesheet" href="carte.css?v=6">
 </head>
 <body>
 <div id="map"></div>
@@ -29,7 +29,11 @@
   <a class="p-back" href="../">‹ Prochains passages</a>
 </aside>
 
+<button type="button" class="locate" id="locate" hidden aria-label="Centrer sur ma position">
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="8"/></svg>
+</button>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-<script src="carte.js?v=5"></script>
+<script src="carte.js?v=6"></script>
 </body>
 </html>

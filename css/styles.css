@@ -243,3 +243,4 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.6); }
 .map .maplibregl-ctrl-top-left { top: 44px; }
 .map .map-badge { z-index: 5; }
 .map .map-btns { z-index: 5; }
+.tabs a.tab-tc { font-size: 10.5px; line-height: 1.1; text-align: center; letter-spacing: 0; }

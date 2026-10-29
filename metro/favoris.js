@@ -97,11 +97,11 @@
     const sig = favs.map(keyOf).join("\n");
     if (list.dataset.sig !== sig) {
       list.dataset.sig = sig;
-      list.innerHTML = favs.map((f, i) => `<li data-i="${i}"><span class="f-tag"></span><span class="f-text"><span class="f-name"></span><span class="f-sub"></span></span><span class="f-when"></span><button type="button" class="f-del" data-del="${i}" aria-label="Supprimer ce favori">×</button></li>`).join("");
+      list.innerHTML = favs.map((f, i) => `<li data-i="${i}"><div class="f-top"><span class="f-tag"></span><span class="f-text"><span class="f-name"></span><span class="f-sub"></span></span><button type="button" class="f-del" data-del="${i}" aria-label="Supprimer ce favori">×</button></div><div class="f-times"><span class="f-when"></span><span class="f-next"></span></div></li>`).join("");
     }
     [...list.children].forEach((li, i) => {
       const f = favs[i], n = nextOf(f), first = n[0];
-      const tag = li.querySelector(".f-tag"), name = li.querySelector(".f-name"), sub = li.querySelector(".f-sub"), when = li.querySelector(".f-when");
+      const tag = li.querySelector(".f-tag"), name = li.querySelector(".f-name"), sub = li.querySelector(".f-sub"), when = li.querySelector(".f-when"), nxt = li.querySelector(".f-next");
       li.classList.toggle("on", keyOf(f) === cur);
       let subTxt;
       if (f.t === "metro") {
@@ -121,7 +121,7 @@
         if (!(f.routes || []).length) subTxt = "Pas de bus direct";
       }
       const second = n[1];
-      if (second) subTxt += " · puis " + fmtShort((second.time - now) / 1000);
+      nxt.textContent = data.lastOk && second ? `(suivant ${fmt((second.time - now) / 1000)})` : "";
       sub.textContent = subTxt;
 
       if (!data.lastOk) { when.className = "f-when none"; when.textContent = "…"; }
