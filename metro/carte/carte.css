@@ -47,3 +47,4 @@ body { font-family: Manrope, system-ui, -apple-system, sans-serif; background: #
 .tip b { font-weight: 800; }
 .tip .badge { display: inline-block; min-width: 22px; text-align: center; padding: 1px 5px; border-radius: 5px; font-weight: 800; margin-right: 4px; }
 .leaflet-container { font-family: inherit; }
+.osm-tiles { filter: grayscale(0.75) brightness(1.04) contrast(0.92); }

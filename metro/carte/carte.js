@@ -90,19 +90,14 @@ function headingAt(route, s) {
 // ---------- Carte ----------
 const map = L.map("map", { zoomControl: false, minZoom: 10, maxZoom: 19 }).setView([48.1115, -1.6800], 13);
 L.control.zoom({ position: "bottomright" }).addTo(map);
-L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png", {
-  subdomains: "abcd", maxZoom: 20,
-  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a> · Données STAR / Rennes Métropole (ODbL)'
+L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  maxZoom: 19, className: "osm-tiles",
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> · Données STAR / Rennes Métropole (ODbL)'
 }).addTo(map);
 map.createPane("busLines").style.zIndex = 410;
 map.createPane("metroLines").style.zIndex = 420;
-map.createPane("labels").style.zIndex = 430;
 map.createPane("buses").style.zIndex = 610;
 map.createPane("trains").style.zIndex = 620;
-map.getPane("labels").style.pointerEvents = "none";
-L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}{r}.png", {
-  subdomains: "abcd", maxZoom: 20, pane: "labels", opacity: 0.85
-}).addTo(map);
 const busCanvas = L.canvas({ pane: "busLines", padding: 0.3, tolerance: 4 });
 const metroCanvas = L.canvas({ pane: "metroLines", padding: 0.3 });
 function onZoom() { map.getContainer().classList.toggle("zoom-far", map.getZoom() < 13); }
