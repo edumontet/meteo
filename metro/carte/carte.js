@@ -379,7 +379,7 @@ const now0 = t => t.eta && t.eta <= Date.now();
 // ---------- Ma position ----------
 // Point bleu qui clignote, cercle de précision, et bouton pour recentrer la carte dessus.
 const me = { marker: null, circle: null, pos: null, centered: false };
-const meIcon = L.divIcon({ className: "me-icon", iconSize: [22, 22], html: '<div class="me"><span class="me-ring"></span><span class="me-ring r2"></span><span class="me-dot"></span></div>' });
+const meIcon = L.divIcon({ className: "me-icon", iconSize: [30, 30], html: '<div class="me"><span class="me-ring"></span><span class="me-ring r2"></span><span class="me-dot"></span></div>' });
 function startLocation() {
   if (!navigator.geolocation) return;
   navigator.geolocation.watchPosition(p => {
