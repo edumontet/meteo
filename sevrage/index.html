@@ -1,0 +1,506 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#EEF3F1" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0C1513" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Mon arrêt">
+<title>Mon arrêt</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+/* Mise en page : une colonne de téléphone, compteurs en tête, puis argent, lecture de la semaine, chronologie complète. */
+:root {
+  padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px);
+  --bg: #EEF3F1; --card: #FFFFFF; --ink: #10201C; --soft: #4E6360; --faint: #8A9C99; --line: #D5E0DD;
+  --tabac: #C2410C; --tabac-bg: #FDEBDD; --alcool: #6D28D9; --alcool-bg: #EDE5FB; --ok: #157F5B; --ok-bg: #DDF3EA; --sum: #10201C;
+  --f-display: "Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
+  --f-body: "Atkinson Hyperlegible", -apple-system, system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0C1513; --card: #15211E; --ink: #E8F0EE; --soft: #A3B5B1; --faint: #6E817D; --line: #26332F;
+  --tabac: #FB8F5A; --tabac-bg: #3A2014; --alcool: #B79BFF; --alcool-bg: #271C3F; --ok: #4FD1A1; --ok-bg: #12352A; --sum: #E8F0EE; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #0C1513; --card: #15211E; --ink: #E8F0EE; --soft: #A3B5B1; --faint: #6E817D; --line: #26332F;
+  --tabac: #FB8F5A; --tabac-bg: #3A2014; --alcool: #B79BFF; --alcool-bg: #271C3F; --ok: #4FD1A1; --ok-bg: #12352A; --sum: #E8F0EE; color-scheme: dark }
+
+body { background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 16px; line-height: 1.55; }
+.wrap { max-width: 560px; margin: 0 auto; padding-block: 20px 48px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 22px; }
+h1, h2, h3 { font-family: var(--f-display); margin: 0; text-wrap: balance; letter-spacing: -0.01em; }
+h1 { font-size: 30px; font-weight: 800; }
+h2 { font-size: 19px; font-weight: 700; }
+h3 { font-size: 16px; font-weight: 700; }
+p { margin: 0; }
+.sub { color: var(--soft); font-size: 14px; }
+.tiny { color: var(--faint); font-size: 12.5px; }
+.num { font-variant-numeric: tabular-nums; }
+.card { background: var(--card); border-radius: 18px; padding: 16px; border: 1px solid var(--line); }
+.section { display: flex; flex-direction: column; gap: 10px; }
+
+.counters { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.counter { border-radius: 18px; padding: 14px; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.counter.tabac { background: var(--tabac-bg); }
+.counter.alcool { background: var(--alcool-bg); }
+.counter .lbl { font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 6px; }
+.tabac .lbl, .tabac .big { color: var(--tabac); }
+.alcool .lbl, .alcool .big { color: var(--alcool); }
+.counter .big { font-family: var(--f-display); font-size: 46px; font-weight: 800; line-height: 1; margin-top: 6px; }
+.counter .big small { font-size: 17px; font-weight: 700; margin-left: 4px; }
+.counter .clock { font-size: 14px; font-weight: 700; color: var(--ink); }
+
+.money-total { font-family: var(--f-display); font-size: 40px; font-weight: 800; line-height: 1.05; }
+.split { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+.split div { border-top: 3px solid; padding-top: 6px; }
+.split .t { border-color: var(--tabac); }
+.split .a { border-color: var(--alcool); }
+.split b { font-size: 19px; display: block; }
+.treat { margin-top: 12px; padding: 10px 12px; border-radius: 12px; background: var(--ok-bg); color: var(--ink); font-size: 14.5px; }
+.treat b { color: var(--ok); }
+
+.chart svg { width: 100%; height: auto; display: block; }
+.legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 13px; color: var(--soft); margin-top: 6px; }
+.legend i { display: inline-block; width: 14px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 6px; }
+
+.read { border-left: 4px solid; border-radius: 0; padding: 4px 0 4px 14px; display: flex; flex-direction: column; gap: 6px; }
+.read.tabac { border-color: var(--tabac); }
+.read.alcool { border-color: var(--alcool); }
+.eyebrow { font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+.read.tabac .eyebrow { color: var(--tabac); }
+.read.alcool .eyebrow { color: var(--alcool); }
+.read p.body { font-size: 16px; }
+.src { font-size: 12px; color: var(--faint); }
+
+.next { display: flex; flex-direction: column; gap: 6px; }
+.bar { height: 8px; border-radius: 4px; background: var(--line); overflow: hidden; }
+.bar i { display: block; height: 100%; border-radius: 4px; }
+.next.tabac .bar i { background: var(--tabac); }
+.next.alcool .bar i { background: var(--alcool); }
+.next-row { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+.next-row b { white-space: nowrap; }
+
+.tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 4px; }
+.tabs button { font: 700 15px var(--f-body); border: 0; border-radius: 10px; padding: 10px; background: transparent; color: var(--soft); cursor: pointer; }
+.tabs button[aria-selected="true"].t { background: var(--tabac-bg); color: var(--tabac); }
+.tabs button[aria-selected="true"].a { background: var(--alcool-bg); color: var(--alcool); }
+.tabs button:focus-visible, summary:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+.timeline { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.timeline li { display: grid; grid-template-columns: 22px 1fr; gap: 10px; position: relative; padding-bottom: 4px; }
+.timeline li::before { content: ""; position: absolute; left: 10px; top: 24px; bottom: -2px; width: 2px; background: var(--line); }
+.timeline li:last-child::before { display: none; }
+.dot { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--line); background: var(--card); display: grid; place-items: center; margin-top: 10px; z-index: 1; }
+.done .dot { background: var(--ok); border-color: var(--ok); }
+.done .dot::after { content: ""; width: 9px; height: 5px; border: solid #fff; border-width: 0 0 2.5px 2.5px; transform: translateY(-1px) rotate(-45deg); }
+.current .dot { border-color: var(--ok); border-width: 3px; }
+details { padding: 8px 0 10px; border-bottom: 1px solid var(--line); min-width: 0; }
+summary { cursor: pointer; list-style: none; display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+summary::-webkit-details-marker { display: none; }
+summary .when { font-size: 12.5px; color: var(--faint); white-space: nowrap; }
+.future summary h3 { color: var(--soft); font-weight: 500; }
+details p { margin-top: 6px; font-size: 15px; color: var(--ink); }
+.kind { font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--faint); margin-right: 6px; }
+
+.tip { background: var(--card); border: 1px dashed var(--line); border-radius: 18px; padding: 14px 16px; }
+.help { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.help div { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 12px; }
+.help b { font-size: 20px; font-family: var(--f-display); user-select: all; }
+.sources { font-size: 12.5px; color: var(--soft); padding-left: 18px; margin: 0; }
+.sources a { color: inherit; }
+@media (max-width: 380px) { .counter .big { font-size: 38px; } .money-total { font-size: 34px; } }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+</head>
+<body>
+<main class="wrap">
+  <header>
+    <h1>Mon arrêt</h1>
+    <p class="sub" id="today">…</p>
+  </header>
+
+  <div class="counters">
+    <div class="counter alcool">
+      <span class="lbl">Sans alcool</span>
+      <span class="big num" id="a-days">–<small>jours</small></span>
+      <span class="clock num" id="a-clock">–</span>
+      <span class="tiny">depuis le lundi 5 octobre 2026</span>
+    </div>
+    <div class="counter tabac">
+      <span class="lbl">Sans tabac</span>
+      <span class="big num" id="t-days">–<small>jours</small></span>
+      <span class="clock num" id="t-clock">–</span>
+      <span class="tiny">depuis le dimanche 18 octobre 2026</span>
+    </div>
+  </div>
+
+  <section class="section">
+    <h2>Mes économies</h2>
+    <div class="card">
+      <p class="sub">Total économisé, en direct</p>
+      <p class="money-total num" id="m-total">–</p>
+      <div class="split">
+        <div class="a"><span class="sub">Alcool · 10 €/jour</span><b class="num" id="m-a">–</b></div>
+        <div class="t"><span class="sub">Tabac · 13,50 €/jour</span><b class="num" id="m-t">–</b></div>
+      </div>
+      <p class="tiny num" style="margin-top:10px" id="m-extra">–</p>
+      <p class="treat" id="m-treat">–</p>
+    </div>
+    <div class="card chart">
+      <div id="chart"></div>
+      <div class="legend"><span><i style="background:var(--sum)"></i>Total</span><span><i style="background:var(--alcool)"></i>Alcool</span><span><i style="background:var(--tabac)"></i>Tabac</span><span>Pointillés : les 30 prochains jours</span></div>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>À lire cette semaine</h2>
+    <div class="card" style="display:flex;flex-direction:column;gap:18px" id="reads"></div>
+  </section>
+
+  <section class="section">
+    <h2>Prochaines étapes</h2>
+    <div class="card" style="display:flex;flex-direction:column;gap:16px" id="nexts"></div>
+  </section>
+
+  <section class="section">
+    <h2>Toutes les étapes</h2>
+    <div class="tabs" role="tablist">
+      <button type="button" role="tab" class="a" id="tab-a" aria-selected="true">Alcool</button>
+      <button type="button" role="tab" class="t" id="tab-t" aria-selected="false">Tabac</button>
+    </div>
+    <ol class="timeline" id="timeline"></ol>
+  </section>
+
+  <section class="section">
+    <h2>L'astuce du jour</h2>
+    <div class="tip" id="tip">–</div>
+  </section>
+
+  <section class="section">
+    <h2>Besoin d'un coup de pouce</h2>
+    <div class="help">
+      <div><span class="sub">Tabac Info Service</span><br><b>39 89</b><br><span class="tiny">Tabacologues, appel gratuit</span></div>
+      <div><span class="sub">Alcool Info Service</span><br><b>0 980 980 930</b><br><span class="tiny">7 j/7, appel anonyme et non surtaxé</span></div>
+    </div>
+    <p class="tiny">Ton médecin traitant peut aussi t'accompagner, et une prise de sang permet de voir ton foie se réparer.</p>
+  </section>
+
+  <section class="section">
+    <h2>Sources</h2>
+    <ol class="sources" id="sources"></ol>
+    <p class="tiny">Les délais sont des repères moyens issus de ces sources : chaque corps va à son rythme. Ces textes encouragent, ils ne remplacent pas l'avis d'un médecin.</p>
+  </section>
+</main>
+
+<script>
+"use strict";
+// ---------- Données fixes ----------
+const PERSON = { born: "1972-05-20", weight: 90 };
+const STOP = {
+  a: { start: new Date("2026-10-05T00:00:00+02:00").getTime(), perDay: 10 },
+  t: { start: new Date("2026-10-18T00:00:00+02:00").getTime(), perDay: 13.5, cigsPerDay: 20 }
+};
+const DAY = 864e5;
+
+const SRC = {
+  oms: ["OMS Europe, Le tabac vous brise le cœur (2018)", "https://www.who.int/europe/fr/news/item/30-05-2018-tobacco-breaks-hearts-choose-health-not-tobacco"],
+  vidal: ["Vidal, Les bénéfices de l'arrêt du tabac", "https://www.vidal.fr/maladies/psychisme/arreter-fumer-cigarette-tabac/benefices.html"],
+  spf: ["Santé publique France, Mois sans tabac", "https://www.santepubliquefrance.fr/les-actualites/record-de-participation-pour-la-3eme-edition-de-moissanstabac"],
+  tis: ["Tabac Info Service", "https://www.tabac-info-service.fr/"],
+  jha: ["Jha et al., New England Journal of Medicine (2013)", "https://www.nejm.org/doi/full/10.1056/NEJMsa1211128"],
+  aubin: ["Aubin et al., BMJ (2012), poids après l'arrêt du tabac", "https://www.bmj.com/content/345/bmj.e4439"],
+  taylor: ["Taylor et al., BMJ (2014), santé mentale après l'arrêt", "https://www.bmj.com/content/348/bmj.g1151"],
+  futura: ["Futura Sciences, Arrêter l'alcool pendant 30 jours", "https://www.futura-sciences.com/sante/questions-reponses/corps-humain-passe-t-il-on-arrete-alcool-pendant-30-jours-effets-jour-jour-k2m6-25713/"],
+  bmj: ["Mehta et al., BMJ Open (2018), un mois sans alcool", "https://bmjopen.bmj.com/content/8/5/e020673"],
+  qare: ["Qare, Arrêt de l'alcool : bienfaits et étapes", "https://www.qare.fr/sante/addiction/alcoolisme/arret/"],
+  inca: ["Institut national du cancer, cancer du foie après l'arrêt de l'alcool", "https://www.cancer.fr/professionnels-de-sante/veille/nota-bene-cancer/bulletin-n-108/how-the-risk-of-liver-cancer-changes-after-alcohol-cessation-a-review-and-meta-analysis-of-the-current-literature"],
+  ais: ["Alcool Info Service", "https://www.alcool-info-service.fr/"]
+};
+
+const H = 1 / 24, W = 7, M = 30.44, Y = 365.25;
+const ageAt = d => { const b = new Date(PERSON.born); let a = d.getFullYear() - b.getFullYear(); if (d.getMonth() < b.getMonth() || (d.getMonth() === b.getMonth() && d.getDate() < b.getDate())) a--; return a; };
+const kg = pct => (PERSON.weight * pct / 100).toLocaleString("fr-FR", { maximumFractionDigits: 1 });
+
+// kind : "corps" = bienfait mesuré ; "semaine" / "mois" / "année" = texte à lire
+const STEPS = {
+  t: [
+    { at: 20 / 1440, kind: "corps", title: "Le cœur se calme", text: "20 minutes après la dernière cigarette, le rythme cardiaque et la tension commencent déjà à baisser.", src: "oms" },
+    { at: 8 * H, kind: "corps", title: "Le corps respire", text: "Les cellules du corps sont de nouveau normalement oxygénées.", src: "vidal" },
+    { at: 12 * H, kind: "corps", title: "Le monoxyde de carbone est parti", text: "Le taux de monoxyde de carbone dans le sang est revenu à un niveau normal. Ton sang transporte à nouveau tout son oxygène.", src: "oms" },
+    { at: 1, kind: "corps", title: "Plus de nicotine", text: "Le corps ne contient plus de nicotine. Le risque d'infarctus commence à baisser et les poumons se mettent à évacuer le mucus et les résidus de fumée.", src: "vidal" },
+    { at: 2, kind: "corps", title: "Le goût et l'odorat reviennent", text: "Les saveurs et les odeurs sont plus nettes. Profite d'un bon repas : il a plus de goût qu'il y a trois jours.", src: "vidal" },
+    { at: 3, kind: "corps", title: "On respire plus facilement", text: "Les bronches s'ouvrent, on se sent plus en forme. C'est aussi souvent le moment où le manque est le plus fort : s'il est passé, le plus dur physiquement est derrière toi.", src: "vidal" },
+    { at: W, kind: "semaine", title: "Semaine 1 : le cap des 7 jours", text: "Une semaine entière sans fumer. Retiens ceci : une envie de cigarette ne dure que quelques minutes. Si elle arrive, bois un grand verre d'eau, bouge, respire lentement : elle passe toujours.", src: "tis" },
+    { at: 2 * W, kind: "semaine", title: "Semaine 2 : le sang circule mieux", text: "Entre 2 et 12 semaines après l'arrêt, la circulation s'améliore et les poumons fonctionnent mieux. Tu peux le sentir dans les escaliers ou en marchant vite.", src: "oms" },
+    { at: 3 * W, kind: "semaine", title: "Semaine 3 : les automatismes s'effacent", text: "Les gestes réflexes (la cigarette du café, d'après le repas, de la pause) perdent de leur force chaque fois que tu les traverses sans fumer. Change un détail du rituel : autre tasse, autre endroit, petite marche.", src: "tis" },
+    { at: 4 * W, kind: "semaine", title: "Semaine 4 : 28 jours, le cap décisif", text: "Un mois sans tabac multiplie par cinq les chances d'arrêter définitivement. C'est tout le principe du Mois sans tabac : tu viens de le réussir.", src: "spf" },
+    { at: 5 * W, kind: "semaine", title: "Semaine 5 : la toux diminue", text: "Entre 2 et 10 semaines, la toux et la fatigue diminuent, on retrouve son souffle. Une petite toux grasse au début est normale : ce sont les poumons qui se nettoient.", src: "vidal" },
+    { at: 6 * W, kind: "semaine", title: "Semaine 6 : le moral s'allège", text: "Les études montrent qu'après l'arrêt, l'anxiété, le stress et la déprime baissent en moyenne, autant qu'avec un traitement antidépresseur. La cigarette ne calmait pas le stress : elle calmait le manque qu'elle créait.", src: "taylor" },
+    { at: 7 * W, kind: "semaine", title: "Semaine 7 : attention au poids, sans panique", text: "Après l'arrêt du tabac, on prend en moyenne 4 à 5 kg la première année. Tu as un vrai atout : tu as aussi arrêté l'alcool, qui apportait beaucoup de calories. Un fruit ou une poignée d'amandes plutôt que du sucre, et de la marche.", src: "aubin" },
+    { at: 8 * W, kind: "semaine", title: "Semaine 8 : deux mois", text: "Deux mois. Ta peau est mieux oxygénée, tes vêtements et ta voiture ne sentent plus le tabac. Fais le calcul en bas de page : cet argent est à toi, offre-toi quelque chose.", src: "oms" },
+    { at: 9 * W, kind: "semaine", title: "Semaine 9 : les envies s'espacent", text: "Les envies deviennent plus rares et plus courtes. Si une envie forte revient d'un coup (une fête, une mauvaise nouvelle), ce n'est pas un échec : c'est un souvenir. Il passe comme les autres.", src: "tis" },
+    { at: 10 * W, kind: "semaine", title: "Semaine 10 : le souffle est revenu", text: "La période où la toux et la fatigue reculent s'achève. Marcher, monter une côte, porter des courses : tout demande moins d'effort qu'avant.", src: "vidal" },
+    { at: 11 * W, kind: "semaine", title: "Semaine 11 : tu es non-fumeur", text: "On ne dit plus « j'essaie d'arrêter » : tu es non-fumeur. Le dire à voix haute aide vraiment à tenir.", src: "tis" },
+    { at: 12 * W, kind: "semaine", title: "Semaine 12 : trois mois", text: "La fenêtre des 2 à 12 semaines est bouclée : circulation améliorée et poumons plus efficaces. Les cils des bronches, qui balaient la poussière, repoussent et se remettent au travail.", src: "oms" },
+    { at: 4 * M, kind: "mois", title: "Mois 4 : moins essoufflé à l'effort", text: "Entre 1 et 9 mois, les bronches retrouvent toutes leurs fonctions. C'est le bon moment pour reprendre une activité : vélo, marche rapide, natation.", src: "vidal" },
+    { at: 5 * M, kind: "mois", title: "Mois 5 : moins de rhumes", text: "Des bronches qui se nettoient seules attrapent moins facilement les infections. L'hiver passe mieux qu'avant.", src: "vidal" },
+    { at: 6 * M, kind: "mois", title: "Mois 6 : la moitié d'une année", text: "Six mois. Les poumons continuent de se réparer chaque semaine. À 54 ans, chaque mois sans tabac compte : arrêter entre 45 et 54 ans fait regagner en moyenne environ 6 ans d'espérance de vie.", src: "jha" },
+    { at: 7 * M, kind: "mois", title: "Mois 7 : la confiance", text: "Tu as traversé les fêtes, les apéros et les coups durs sans fumer. Ce que tu as fait jusqu'ici, tu peux continuer à le faire.", src: "tis" },
+    { at: 8 * M, kind: "mois", title: "Mois 8 : le souffle d'un non-fumeur", text: "Les bronches poursuivent leur réparation. La toux du matin n'est plus qu'un souvenir pour la plupart des anciens fumeurs.", src: "vidal" },
+    { at: 9 * M, kind: "mois", title: "Mois 9 : les bronches sont réparées", text: "La période de 1 à 9 mois s'achève : les bronches ont retrouvé leurs fonctions, on est beaucoup moins essoufflé après un effort.", src: "vidal" },
+    { at: 10 * M, kind: "mois", title: "Mois 10 : le cœur continue", text: "Le risque d'infarctus baisse chaque mois. Dans deux mois, il aura diminué de moitié.", src: "oms" },
+    { at: 11 * M, kind: "mois", title: "Mois 11 : presque un an", text: "Encore un mois et tu fêtes un an. Repense à la personne qui a écrasé sa dernière cigarette le 18 octobre : elle serait fière.", src: "tis" },
+    { at: 1 * Y, kind: "année", title: "1 an : le risque cardiaque divisé par deux", text: "Un an après l'arrêt, le risque de maladie coronarienne est environ la moitié de celui d'un fumeur.", src: "oms" },
+    { at: 2 * Y, kind: "année", title: "2 ans", text: "Le cœur et les vaisseaux continuent de récupérer. Ton risque cardiovasculaire se rapproche, année après année, de celui d'un non-fumeur.", src: "oms" },
+    { at: 5 * Y, kind: "année", title: "5 ans : le risque d'AVC rejoint celui d'un non-fumeur", text: "Entre 5 et 15 ans après l'arrêt, le risque d'accident vasculaire cérébral redevient celui d'une personne qui n'a jamais fumé.", src: "oms" },
+    { at: 10 * Y, kind: "année", title: "10 ans : le risque de cancer du poumon divisé par deux", text: "Dix ans après l'arrêt, le risque de cancer du poumon est environ la moitié de celui d'un fumeur.", src: "oms" },
+    { at: 15 * Y, kind: "année", title: "15 ans : comme si tu n'avais jamais fumé", text: "Le risque de maladie coronarienne est celui d'une personne qui n'a jamais fumé.", src: "oms" }
+  ],
+  a: [
+    { at: 3, kind: "corps", title: "Le sevrage est derrière toi", text: "Les premiers jours sont ceux du sevrage : tremblements, sueurs, nervosité, mauvais sommeil. Ils durent quelques jours, une semaine au plus. Tu les as traversés.", src: "qare" },
+    { at: W, kind: "semaine", title: "Semaine 1 : le foie se met au travail", text: "Dès la première semaine, la graisse et l'inflammation du foie diminuent nettement. Le foie est l'un des rares organes capables de se réparer lui-même.", src: "futura" },
+    { at: 2 * W, kind: "semaine", title: "Semaine 2 : un sommeil plus réparateur", text: "L'alcool fait tomber de sommeil mais casse les phases de sommeil profond. Sans lui, les nuits redeviennent plus réparatrices : on se réveille moins fatigué.", src: "qare" },
+    { at: 3 * W, kind: "semaine", title: "Semaine 3 : un foie gras peut guérir", text: "Chez une personne qui a un foie gras, 2 à 3 semaines sans alcool peuvent suffire pour que le foie retrouve un fonctionnement normal.", src: "futura" },
+    { at: 4 * W, kind: "semaine", title: "Semaine 4 : ce que mesure la science", text: `Après un mois sans alcool, des buveurs réguliers ont vu en moyenne leur tension baisser de 6 %, leur résistance à l'insuline de 25 % et leur poids de 1,5 %, soit environ ${kg(1.5)} kg pour toi.`, src: "bmj" },
+    { at: 5 * W, kind: "semaine", title: "Semaine 5 : le moment de faire une prise de sang", text: "Le taux de gamma GT, qui reflète l'état du foie, baisse après l'arrêt. Demande une prise de sang à ton médecin : voir les chiffres s'améliorer est très motivant.", src: "qare" },
+    { at: 6 * W, kind: "semaine", title: "Semaine 6 : la tête plus claire", text: "Meilleure concentration, mémoire plus vive, humeur plus stable : le cerveau récupère une partie des capacités que l'alcool émoussait.", src: "qare" },
+    { at: 7 * W, kind: "semaine", title: "Semaine 7 : un nouveau rituel", text: "Le verre du soir était un rituel. Garde le rituel, change le contenu : eau pétillante citron, tisane, bière sans alcool. Le geste reste, le poison part.", src: "ais" },
+    { at: 8 * W, kind: "semaine", title: "Semaine 8 : deux mois", text: "Deux mois. La peau est mieux hydratée, le teint plus net, l'énergie plus régulière dans la journée.", src: "qare" },
+    { at: 9 * W, kind: "semaine", title: "Semaine 9 : savoir dire non", text: "« Non merci, je ne bois pas. » Pas besoin de te justifier. Plus tu le dis, plus c'est simple, et plus les autres l'acceptent.", src: "ais" },
+    { at: 10 * W, kind: "semaine", title: "Semaine 10 : un allié pour le tabac", text: "Arrêter l'alcool aide à ne pas reprendre la cigarette : les deux envies allaient souvent ensemble. Tu as retiré les deux, c'est ta meilleure protection.", src: "qare" },
+    { at: 11 * W, kind: "semaine", title: "Semaine 11 : les deux ensemble", text: "Le tabac et l'alcool combinés multiplient le risque de cancers de la bouche et de la gorge. En arrêtant les deux, tu as supprimé ce cumul.", src: "inca" },
+    { at: 12 * W, kind: "semaine", title: "Semaine 12 : trois mois", text: "Trois mois. Pour un foie légèrement atteint, quelques mois suffisent à revenir à la normale. Tu es en plein dedans.", src: "futura" },
+    { at: 4 * M, kind: "mois", title: "Mois 4 : un sang tout neuf", text: "Un globule rouge vit environ 120 jours : tous ceux qui circulent aujourd'hui sont nés depuis ton arrêt, dans un corps sans alcool.", src: "qare" },
+    { at: 5 * M, kind: "mois", title: "Mois 5 : la tension s'installe plus bas", text: "Moins d'alcool, c'est une tension artérielle plus basse et un cœur moins sollicité, jour après jour.", src: "futura" },
+    { at: 6 * M, kind: "mois", title: "Mois 6 : la moitié d'une année", text: "Six mois. Pense à tout ce que tu as vécu sans un verre : des repas, des soirées, des soucis. Tu sais maintenant que tu peux.", src: "ais" },
+    { at: 7 * M, kind: "mois", title: "Mois 7 : le moral", text: "L'alcool entretient souvent la déprime et l'anxiété. Son arrêt est l'une des conditions pour qu'elles s'améliorent durablement.", src: "qare" },
+    { at: 8 * M, kind: "mois", title: "Mois 8 : le poids", text: "Sans les calories de l'alcool, la silhouette s'affine. C'est aussi ce qui compense la prise de poids possible après l'arrêt du tabac.", src: "bmj" },
+    { at: 9 * M, kind: "mois", title: "Mois 9 : un foie au repos", text: "Pour les atteintes légères, le foie a eu tout le temps de guérir. Un contrôle chez ton médecin te le confirmera.", src: "futura" },
+    { at: 10 * M, kind: "mois", title: "Mois 10 : le cerveau récupère", text: "Une partie des capacités de mémoire et d'attention altérées par l'alcool se récupère avec le temps sans alcool.", src: "qare" },
+    { at: 11 * M, kind: "mois", title: "Mois 11 : presque un an", text: "Encore un mois et tu fêtes un an sans alcool. C'est le bon moment pour fixer la récompense que tu t'offriras avec tes économies.", src: "ais" },
+    { at: 1 * Y, kind: "année", title: "1 an : le risque de cancer commence à reculer", text: "Le risque de cancer du foie baisse d'environ 6 à 7 % par année sans alcool. Le premier pas est fait.", src: "inca" },
+    { at: 2 * Y, kind: "année", title: "2 ans", text: "Le cœur, le foie et le cerveau continuent de profiter de chaque année sans alcool. Le risque de plusieurs cancers et de maladies cardiovasculaires continue de baisser.", src: "futura" },
+    { at: 5 * Y, kind: "année", title: "5 ans", text: "Cinq ans. Le risque de cancer du foie a nettement reculé depuis l'arrêt, à raison d'environ 6 à 7 % par an.", src: "inca" },
+    { at: 10 * Y, kind: "année", title: "10 ans", text: "Dix ans sans alcool. Les risques liés à l'alcool continuent de se rapprocher, année après année, de ceux d'une personne qui ne boit pas.", src: "inca" }
+  ]
+};
+
+const TIPS = [
+  "Une envie de cigarette dure 3 à 5 minutes. Regarde l'heure quand elle arrive : tu verras qu'elle passe.",
+  "Bois un grand verre d'eau fraîche, lentement. Ça occupe la bouche, les mains et ça coupe l'envie.",
+  "Respire : inspire 4 secondes, bloque 4 secondes, souffle 6 secondes. Trois fois. Le calme revient.",
+  "Évite les endroits et les moments où tu fumais et buvais le plus, au moins les premières semaines.",
+  "Garde des chewing-gums sans sucre ou des bâtonnets de réglisse sur toi.",
+  "Prépare ta réponse : « Non merci, je ne bois plus. » Pas besoin d'explication.",
+  "Le soir, remplace l'apéritif par une boisson que tu aimes vraiment : eau gazeuse citron-menthe, jus de tomate, bière sans alcool.",
+  "Marche dix minutes dès qu'une envie monte. Le corps en mouvement oublie la cigarette.",
+  "Mets l'argent économisé de côté pour de vrai : un virement chaque semaine sur un compte « récompense ».",
+  "Raconte ton arrêt à un proche. Quelqu'un qui sait est quelqu'un qui t'encourage.",
+  "Les substituts nicotiniques (patchs, gommes) sont remboursés sur prescription : demande à ton médecin ou à ton pharmacien.",
+  "Si tu craques une fois, ce n'est pas une rechute. Remets le compteur dans ta tête à zéro et continue : le corps garde les bénéfices.",
+  "Dors bien : la fatigue rend les envies plus fortes. Couche-toi un peu plus tôt cette semaine.",
+  "Brosse-toi les dents après le repas : le goût frais coupe l'envie de la cigarette d'après.",
+  "Note sur ton téléphone les trois raisons pour lesquelles tu as arrêté. Relis-les quand ça tire."
+];
+
+// Ce qu'on peut s'offrir avec les économies
+const TREATS = [
+  [20, "un bon livre ou une place de cinéma avec pop-corn"],
+  [50, "un vrai restaurant à deux"],
+  [100, "une belle paire de chaussures de marche"],
+  [200, "une nuit dans un bel hôtel à Saint-Malo"],
+  [400, "un week-end complet à deux, resto compris"],
+  [700, "un bon vélo"],
+  [1000, "une semaine de vacances"],
+  [2000, "un iPhone neuf"],
+  [4000, "un beau voyage à l'étranger"],
+  [8000, "une petite voiture d'occasion"],
+  [15000, "une année entière de voyages"]
+];
+
+// ---------- Outils ----------
+const $ = id => document.getElementById(id);
+const eur = v => v.toLocaleString("fr-FR", { style: "currency", currency: "EUR", minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const eur0 = v => v.toLocaleString("fr-FR", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
+const pad = n => String(n).padStart(2, "0");
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const NAME = { a: "Alcool", t: "Tabac" };
+
+function elapsed(k, now) { return Math.max(0, now - STOP[k].start); }
+function saved(k, now) { return elapsed(k, now) / DAY * STOP[k].perDay; }
+
+function fmtDelay(days) {
+  if (days < 1 / 24) return Math.round(days * 1440) + " min";
+  if (days < 1) return Math.round(days * 24) + " h";
+  if (days < 14) { const d = Math.round(days); return d + (d > 1 ? " jours" : " jour"); }
+  if (days < 7 * 13) return Math.round(days / 7) + " semaines";
+  if (days < 360) return Math.round(days / M) + " mois";
+  const y = Math.round(days / Y); return y + (y > 1 ? " ans" : " an");
+}
+function fmtLeft(ms) {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  const d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60);
+  if (d >= 2) return `dans ${d} jours`;
+  if (d === 1) return `dans 1 jour et ${h} h`;
+  if (h >= 1) return `dans ${h} h ${pad(m)}`;
+  return `dans ${m} min ${pad(s % 60)} s`;
+}
+const dateFr = t => new Date(t).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+const dateShort = t => new Date(t).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" });
+
+// ---------- Rendu ----------
+function renderCounters(now) {
+  for (const k of ["a", "t"]) {
+    const e = elapsed(k, now);
+    const d = Math.floor(e / DAY), h = Math.floor(e % DAY / 36e5), m = Math.floor(e % 36e5 / 6e4), s = Math.floor(e % 6e4 / 1e3);
+    $(k + "-days").innerHTML = `${d}<small>${d > 1 ? "jours" : "jour"}</small>`;
+    $(k + "-clock").textContent = `${h} h ${pad(m)} min ${pad(s)} s`;
+  }
+}
+
+function renderMoney(now) {
+  const a = saved("a", now), t = saved("t", now), total = a + t;
+  $("m-total").textContent = eur(total);
+  $("m-a").textContent = eur(a);
+  $("m-t").textContent = eur(t);
+  const cigs = Math.floor(elapsed("t", now) / DAY * STOP.t.cigsPerDay);
+  const year = (STOP.a.perDay + STOP.t.perDay) * 365;
+  $("m-extra").textContent = `${cigs.toLocaleString("fr-FR")} cigarettes non fumées · ${eur0((STOP.a.perDay + STOP.t.perDay) * 30.44)} par mois · ${eur0(year)} par an`;
+  let got = null, next = null;
+  for (const tr of TREATS) { if (total >= tr[0]) got = tr; else { next = tr; break; } }
+  $("m-treat").innerHTML = (got ? `Tu peux déjà t'offrir <b>${esc(got[1])}</b>.` : "Les premiers euros sont là.") +
+    (next ? ` Encore ${eur0(next[0] - total)} et c'est ${esc(next[1])}.` : "");
+}
+
+function renderChart(now) {
+  const css = getComputedStyle(document.documentElement);
+  const c = n => css.getPropertyValue(n).trim();
+  const W0 = 360, H0 = 190, L = 44, R = 12, T = 14, B = 26;
+  const t0 = STOP.a.start, tNow = now, t1 = now + 30 * DAY;
+  const maxV = (saved("a", t1) + saved("t", t1));
+  const step = maxV > 1500 ? 500 : maxV > 600 ? 200 : 100;
+  const top = Math.ceil(maxV / step) * step;
+  const x = t => L + (t - t0) / (t1 - t0) * (W0 - L - R);
+  const y = v => T + (1 - v / top) * (H0 - T - B);
+  const pts = (fn, from, to) => { const out = []; const n = 60; for (let i = 0; i <= n; i++) { const t = from + (to - from) * i / n; out.push(x(t).toFixed(1) + "," + y(fn(t)).toFixed(1)); } return out.join(" "); };
+  const fa = t => saved("a", t), ft = t => saved("t", t), fs = t => fa(t) + ft(t);
+  let grid = "";
+  for (let v = 0; v <= top; v += step) grid += `<line x1="${L}" x2="${W0 - R}" y1="${y(v)}" y2="${y(v)}" stroke="${c("--line")}" stroke-width="1"/><text x="${L - 6}" y="${y(v) + 4}" text-anchor="end" font-size="10.5" fill="${c("--faint")}">${v} €</text>`;
+  const ticks = [[STOP.a.start, "5 oct."], [STOP.t.start, "18 oct."], [tNow, "auj."]];
+  let xt = ticks.map(([t, l]) => `<text x="${x(t)}" y="${H0 - 8}" text-anchor="middle" font-size="10.5" fill="${c("--faint")}">${l}</text>`).join("");
+  xt += `<text x="${W0 - R}" y="${H0 - 8}" text-anchor="end" font-size="10.5" fill="${c("--faint")}">+30 j</text>`;
+  const line = (fn, col, w, from, to, dash) => `<polyline points="${pts(fn, from, to)}" fill="none" stroke="${col}" stroke-width="${w}" stroke-linejoin="round" stroke-linecap="round"${dash ? ' stroke-dasharray="4 4" opacity="0.7"' : ""}/>`;
+  const tStart = Math.max(STOP.t.start, t0);
+  const svg = `<svg viewBox="0 0 ${W0} ${H0}" role="img" aria-label="Courbe des économies cumulées depuis le 5 octobre">
+    ${grid}
+    <line x1="${x(tNow)}" x2="${x(tNow)}" y1="${T}" y2="${H0 - B}" stroke="${c("--faint")}" stroke-dasharray="2 3"/>
+    ${line(fa, c("--alcool"), 2.5, t0, tNow)}${line(fa, c("--alcool"), 2, tNow, t1, true)}
+    ${line(ft, c("--tabac"), 2.5, tStart, tNow)}${line(ft, c("--tabac"), 2, tNow, t1, true)}
+    ${line(fs, c("--sum"), 3, t0, tNow)}${line(fs, c("--sum"), 2, tNow, t1, true)}
+    <circle cx="${x(tNow)}" cy="${y(fs(tNow))}" r="4.5" fill="${c("--sum")}" stroke="${c("--card")}" stroke-width="2"/>
+    <text x="${x(tNow) - 8}" y="${y(fs(tNow)) - 9}" text-anchor="end" font-size="12" font-weight="700" fill="${c("--sum")}">${eur0(fs(tNow))}</text>
+    ${xt}
+  </svg>`;
+  $("chart").innerHTML = svg;
+}
+
+function currentRead(k, now) {
+  const days = elapsed(k, now) / DAY;
+  let cur = null;
+  for (const s of STEPS[k]) if (s.at <= days) cur = s;
+  return cur;
+}
+function nextStep(k, now) {
+  const days = elapsed(k, now) / DAY;
+  const list = STEPS[k];
+  const i = list.findIndex(s => s.at > days);
+  if (i < 0) return null;
+  return { step: list[i], prev: i > 0 ? list[i - 1].at : 0 };
+}
+
+let lastReadKey = "";
+function renderReads(now) {
+  const key = ["a", "t"].map(k => { const r = currentRead(k, now); return r ? r.at : "-"; }).join("|");
+  if (key === lastReadKey) return;
+  lastReadKey = key;
+  $("reads").innerHTML = ["t", "a"].map(k => {
+    const r = currentRead(k, now);
+    if (!r) return "";
+    const cls = k === "t" ? "tabac" : "alcool";
+    return `<article class="read ${cls}"><span class="eyebrow">${NAME[k]} · depuis ${fmtDelay(r.at)}</span><h3>${esc(r.title)}</h3><p class="body">${esc(r.text)}</p><span class="src">Source : ${esc(SRC[r.src][0])}</span></article>`;
+  }).join("");
+}
+
+function renderNexts(now) {
+  $("nexts").innerHTML = ["t", "a"].map(k => {
+    const n = nextStep(k, now);
+    if (!n) return "";
+    const cls = k === "t" ? "tabac" : "alcool";
+    const e = elapsed(k, now) / DAY;
+    const pct = Math.max(0, Math.min(100, (e - n.prev) / (n.step.at - n.prev) * 100));
+    const when = STOP[k].start + n.step.at * DAY;
+    return `<div class="next ${cls}"><div class="next-row"><span class="eyebrow" style="color:var(--${cls})">${NAME[k]}</span><b class="num">${fmtLeft(when - now)}</b></div>
+      <h3>${esc(n.step.title)}</h3><div class="bar"><i style="width:${pct.toFixed(1)}%"></i></div><span class="tiny">le ${dateFr(when)}</span></div>`;
+  }).join("");
+}
+
+let tab = "a";
+try { const v = localStorage.getItem("arret.tab"); if (v === "a" || v === "t") tab = v; } catch (e) {}
+let lastTl = "";
+function renderTimeline(now, force) {
+  const days = elapsed(tab, now) / DAY;
+  const reached = STEPS[tab].filter(s => s.at <= days).length;
+  const key = tab + reached;
+  if (key === lastTl && !force) return;
+  lastTl = key;
+  $("tab-a").setAttribute("aria-selected", tab === "a");
+  $("tab-t").setAttribute("aria-selected", tab === "t");
+  $("timeline").innerHTML = STEPS[tab].map((s, i) => {
+    const state = i < reached ? (i === reached - 1 ? "done current" : "done") : "future";
+    const when = STOP[tab].start + s.at * DAY;
+    const label = s.kind === "corps" ? '<span class="kind">Corps</span>' : "";
+    return `<li class="${state}"><span class="dot" aria-hidden="true"></span><details${i === reached - 1 ? " open" : ""}>
+      <summary><h3>${label}${esc(s.title)}</h3><span class="when">${i < reached ? "atteint" : dateShort(when)}</span></summary>
+      <p>${esc(s.text)}</p><p class="src">${fmtDelay(s.at)} après l'arrêt · ${esc(SRC[s.src][0])}</p></details></li>`;
+  }).join("");
+}
+for (const k of ["a", "t"]) $("tab-" + k).addEventListener("click", () => {
+  tab = k;
+  try { localStorage.setItem("arret.tab", k); } catch (e) {}
+  renderTimeline(Date.now(), true);
+});
+
+function renderStatic(now) {
+  const d = new Date(now);
+  $("today").textContent = `${dateFr(now).replace(/^./, c => c.toUpperCase())} · ${ageAt(d)} ans, ${PERSON.weight} kg`;
+  const dayIndex = Math.floor((now - STOP.a.start) / DAY);
+  $("tip").textContent = TIPS[((dayIndex % TIPS.length) + TIPS.length) % TIPS.length];
+  $("sources").innerHTML = Object.values(SRC).map(([t, u]) => `<li><a href="${u}" target="_blank" rel="noopener">${esc(t)}</a></li>`).join("");
+}
+
+let lastMinute = -1;
+function tick() {
+  const now = Date.now();
+  renderCounters(now);
+  renderMoney(now);
+  renderNexts(now);
+  renderReads(now);
+  renderTimeline(now);
+  const minute = Math.floor(now / 6e4);
+  if (minute !== lastMinute) { lastMinute = minute; renderChart(now); renderStatic(now); }
+}
+tick();
+setInterval(tick, 1000);
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => renderChart(Date.now()));
+new MutationObserver(() => renderChart(Date.now())).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+</script>
+
+</body>
+</html>
