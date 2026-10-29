@@ -249,18 +249,23 @@ async function refreshBuses() {
       } else if (v.lat !== lat || v.lon !== lon) {
         moveTo(v, lat, lon, true);
       }
-      // Sens de marche : d'après le tracé de la ligne, sinon d'après le déplacement
-      let heading = null;
-      let best = null;
+      // Sens de marche : le tracé de la ligne donne le cap le long de la rue ; le déplacement réel
+      // depuis la position précédente tranche quand la ligne passe deux fois dans la même rue.
+      let routeH = null, moveH = null, best = null;
       for (const r of S.routes[b.idligne + "|" + b.sens] || []) {
         const p = project(r, lon, lat);
         if (!best || p.d < best.d) best = p;
       }
-      if (best && best.d < 60) heading = best.heading;
-      else if (v.lat != null) {
-        const dx = (lon - v.lon) * KX, dy = (lat - v.lat) * KY;
-        heading = Math.hypot(dx, dy) > 8 ? (Math.atan2(dx, dy) * 180 / Math.PI + 360) % 360 : v.heading;
+      if (best && best.d < 60) routeH = best.heading;
+      if (v.lat != null) {
+        const dx = (lon - v.lon) * KX, dy = (lat - v.lat) * KY, dist = Math.hypot(dx, dy);
+        if (dist > 20 && dist < 1500) moveH = (Math.atan2(dx, dy) * 180 / Math.PI + 360) % 360;
       }
+      const gap = (x, y) => Math.abs(((x - y) % 360 + 540) % 360 - 180);
+      let heading;
+      if (moveH != null) heading = routeH != null && gap(routeH, moveH) < 75 ? routeH : moveH;
+      else if (routeH != null) heading = v.heading != null && gap(routeH, v.heading) > 120 ? v.heading : routeH;
+      else heading = v.heading;
       v.lat = lat; v.lon = lon; v.heading = heading;
       setHeading(v, heading);
       const late = b.ecartsecondes;

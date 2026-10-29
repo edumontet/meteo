@@ -25,9 +25,9 @@ body { font-family: Manrope, system-ui, -apple-system, sans-serif; background: #
 .veh { position: relative; width: 100%; height: 100%; }
 .veh .arrow { position: absolute; inset: 0; transition: transform .6s ease; }
 .veh .arrow::before {
-  content: ""; position: absolute; left: 50%; top: -7px; transform: translateX(-50%);
-  border-left: 6px solid transparent; border-right: 6px solid transparent; border-bottom: 9px solid var(--c);
-  filter: drop-shadow(0 0 1px rgba(255,255,255,.9));
+  content: ""; position: absolute; left: 50%; top: -10px; transform: translateX(-50%);
+  border-left: 7px solid transparent; border-right: 7px solid transparent; border-bottom: 11px solid #0B1220;
+  filter: drop-shadow(0 0 1.5px #fff) drop-shadow(0 0 1px #fff);
 }
 .veh.noarrow .arrow { display: none; }
 .veh .dot {
@@ -37,7 +37,7 @@ body { font-family: Manrope, system-ui, -apple-system, sans-serif; background: #
   font-size: 10px; font-weight: 800; letter-spacing: -0.03em; line-height: 1; white-space: nowrap; overflow: hidden;
 }
 .veh.metro .dot { border-radius: 7px; font-size: 14px; border-width: 2.5px; }
-.veh.metro .arrow::before { top: -9px; border-left-width: 7px; border-right-width: 7px; border-bottom-width: 11px; }
+.veh.metro .arrow::before { top: -13px; border-left-width: 9px; border-right-width: 9px; border-bottom-width: 13px; }
 
 /* Zoom éloigné : pastilles plus petites, sans texte */
 .zoom-far .veh-icon.bus .veh { transform: scale(.6); }
