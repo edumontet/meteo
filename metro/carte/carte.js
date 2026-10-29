@@ -5,6 +5,7 @@
 const API = "https://data.explore.star.fr/api/explore/v2.1/catalog/datasets/";
 const BUS_MS = 5000;         // on interroge souvent pour attraper chaque nouveau paquet de positions
 const METRO_MS = 20000;      // heures de passage du métro
+const PASS_MS = 15000;       // heures de passage des bus aux arrêts (pour estimer leur position entre deux GPS)
 const CACHE_DAYS = 7;
 const HIDDEN_FAMILIES = ["Transport scolaire", "Evènementiel", "Covoiturage", "BreizhGo", "Spéciale"];
 
@@ -58,10 +59,11 @@ function makeRoute(coords) {
   return { coords, xy, cum, length: cum[cum.length - 1] };
 }
 // Point le plus proche sur le tracé : distance au tracé, abscisse, cap (degrés depuis le nord)
-function project(route, lon, lat) {
+function project(route, lon, lat, sMin) {
   const [px, py] = toXY(lon, lat);
   let best = { d: Infinity };
   for (let i = 1; i < route.xy.length; i++) {
+    if (sMin != null && route.cum[i] < sMin) continue; // on ne cherche qu'en aval de sMin
     const [ax, ay] = route.xy[i - 1], [bx, by] = route.xy[i];
     const dx = bx - ax, dy = by - ay, L2 = dx * dx + dy * dy;
     const t = L2 ? Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / L2)) : 0;
@@ -111,6 +113,8 @@ const S = {
   passages: [],       // métro : { idarret, sens, arr, dep }
   busOk: 0, metroOk: 0, busErr: null, metroErr: null,
   busInterval: 45000, lastPacket: 0,
+  busPass: new Map(), // "idligne|sens|idarret" -> [{ arr, dep }] prochains passages des bus (temps réel)
+  passOk: 0, stopsReady: false,
   packets: 0,         // nombre de nouveaux paquets de positions vus depuis l'ouverture
   loadedAt: 0         // heure du tout premier chargement des positions
 };
@@ -147,7 +151,9 @@ async function loadBusShapes() {
   rows.sort((a, b) => order(a.l) - order(b.l));
   for (const r of rows) {
     const k = r.l + "|" + r.s;
-    (S.routes[k] || (S.routes[k] = [])).push(makeRoute(r.c));
+    const route = makeRoute(r.c);
+    route.pid = r.id;
+    (S.routes[k] || (S.routes[k] = [])).push(route);
     const info = S.lines[r.l];
     if (!info || HIDDEN_FAMILIES.includes(info.fam)) continue;
     L.polyline(r.c.map(p => [p[1], p[0]]), {
@@ -155,6 +161,142 @@ async function loadBusShapes() {
     }).bindTooltip(`<span class="badge" style="background:${esc(info.color)};color:${esc(info.text)}">${esc(info.short)}</span>`, { sticky: true, className: "tip", direction: "top", offset: [0, -6] })
       .addTo(map);
   }
+}
+
+// Arrêts de chaque parcours de bus, placés sur le tracé (abscisse en mètres depuis le départ)
+async function loadBusStops() {
+  let data = cacheGet("bus-stops");
+  if (!data) {
+    const [des, pts] = await Promise.all([
+      exportJson("tco-bus-topologie-dessertes-td", { select: "idparcours,idarret,ordre" }),
+      exportJson("tco-bus-topologie-pointsarret-td", { select: "id,coordonnees" })
+    ]);
+    const pt = {};
+    for (const p of pts) if (p.coordonnees) pt[p.id] = [p.coordonnees.lon, p.coordonnees.lat];
+    const byPar = {};
+    for (const d of des) (byPar[d.idparcours] || (byPar[d.idparcours] = [])).push(d);
+    data = {};
+    for (const routes of Object.values(S.routes)) for (const r of routes) {
+      const out = [];
+      let sMin = null;
+      for (const d of (byPar[r.pid] || []).sort((a, b) => a.ordre - b.ordre)) {
+        const c = pt[d.idarret];
+        if (!c) continue;
+        const p = project(r, c[0], c[1], sMin);
+        if (!(p.d < 80)) continue;
+        out.push([String(d.idarret), Math.round(p.s)]);
+        sMin = p.s - 5;
+      }
+      data[r.pid] = out;
+    }
+    cacheSet("bus-stops", data);
+  }
+  for (const routes of Object.values(S.routes)) for (const r of routes) r.stops = (data[r.pid] || []).map(([id, s]) => ({ id, s }));
+  S.stopsReady = true;
+}
+
+// Heures de passage prévues de tous les bus aux arrêts dans les prochaines minutes (temps réel STAR)
+async function refreshBusPassages() {
+  if (!S.stopsReady) return;
+  try {
+    const sel = { select: "idligne,sens,idarret,arrivee,depart", timezone: "Europe/Paris" };
+    let rows;
+    try {
+      rows = await exportJson("tco-bus-circulation-passages-tr", Object.assign({ where: "arrivee < now(minutes=12) or depart < now(minutes=12)" }, sel));
+    } catch (e) {
+      rows = await exportJson("tco-bus-circulation-passages-tr", sel);
+    }
+    const lim = Date.now() + 12 * 60000, m = new Map();
+    for (const r of rows) {
+      let arr = parseTime(r.arrivee), dep = parseTime(r.depart);
+      if (isNaN(arr)) arr = dep;
+      if (isNaN(dep)) dep = arr;
+      if (isNaN(arr) || arr > lim) continue;
+      const k = r.idligne + "|" + r.sens + "|" + r.idarret;
+      if (!m.has(k)) m.set(k, []);
+      m.get(k).push({ arr, dep });
+    }
+    for (const l of m.values()) l.sort((a, b) => a.arr - b.arr);
+    S.busPass = m; S.passOk = Date.now();
+    for (const v of S.buses.values()) planBus(v);
+  } catch (e) {
+    console.warn("passages bus", e);
+  }
+}
+
+// Comme pour le métro : à partir de la dernière position GPS, on enchaîne les heures de passage
+// prévues aux arrêts suivants. Cela donne un horaire de marche (heure → abscisse) que le bus suit
+// en continu ; chaque nouveau paquet GPS le recale.
+// Le bus le plus proche en amont d'un arrêt est celui qui y passera le premier : on prend donc,
+// à chaque arrêt, le premier passage qui n'est pas avant celui retenu à l'arrêt précédent.
+function planBus(v) {
+  const g = v.gps;
+  let plan = null;
+  if (g) {
+    let best = null;
+    for (const r of S.routes[v.rkey] || []) {
+      if (!r.stops || !r.stops.length) continue;
+      const p = project(r, g.lon, g.lat);
+      if (!best || p.d < best.p.d) best = { r, p };
+    }
+    if (best && best.p.d < 60) {
+      const r = best.r, now = Date.now();
+      const knots = [[g.t, best.p.s]];
+      let tPrev = g.t, sPrev = best.p.s;
+      for (const st of r.stops) {
+        if (st.s <= sPrev + 10) continue;
+        if (knots.length >= 12) break;
+        const list = S.busPass.get(v.rkey + "|" + st.id);
+        if (!list) continue; // arrêt sans prévision : on regarde le suivant
+        const pass = list.find(p => p.dep >= Math.max(tPrev, now) - 30000);
+        if (!pass) break;
+        const dist = st.s - sPrev;
+        const arr = Math.max(pass.arr, tPrev + dist / 15 * 1000); // jamais plus de 54 km/h
+        if (dist / ((arr - tPrev) / 1000) < 1 && dist > 150) break; // bien trop lent : c'est sûrement le bus suivant
+        const dep = Math.max(arr, Math.min(pass.dep, arr + 90000));
+        knots.push([arr, st.s]);
+        if (dep > arr) knots.push([dep, st.s]);
+        tPrev = dep; sPrev = st.s;
+      }
+      if (knots.length >= 2) plan = { r, knots };
+    }
+  }
+  if (plan) {
+    if (!v.plan || v.plan.r !== plan.r) { // nouveau tracé : on part de l'endroit où le bus est affiché
+      const c = v.marker.getLatLng();
+      const p = project(plan.r, c.lng, c.lat);
+      v.sd = p.d < 80 ? p.s : planS(plan, Date.now());
+    }
+    v.ptgt = planS(plan, Date.now());
+    v.to = null;
+  }
+  v.plan = plan;
+}
+function planS(plan, t) {
+  const k = plan.knots;
+  if (t <= k[0][0]) return k[0][1];
+  for (let i = 1; i < k.length; i++) if (t <= k[i][0]) {
+    const [t0, s0] = k[i - 1], [t1, s1] = k[i];
+    return s0 + (s1 - s0) * ((t - t0) / (t1 - t0 || 1));
+  }
+  return k[k.length - 1][1];
+}
+// Avance un bus suivi à l'horaire : il suit l'estimation, et rattrape en douceur (≈ 2 s) l'écart
+// laissé par un recalage GPS. S'il est un peu en avance, il ralentit au lieu de reculer.
+function stepPlanned(v, dt) {
+  const tgt = planS(v.plan, Date.now());
+  if (v.sd == null) v.sd = tgt;
+  const gap = tgt - v.sd;
+  if (Math.abs(gap) > 800) v.sd = tgt; // trop loin : on replace directement
+  else {
+    let next = v.sd + Math.max(0, tgt - v.ptgt) + gap * (1 - Math.exp(-dt / 1800));
+    if (next < v.sd && -gap < 150) next = v.sd;
+    v.sd = next;
+  }
+  v.ptgt = tgt;
+  v.marker.setLatLng(pointAt(v.plan.r, v.sd));
+  const h = headingAt(v.plan.r, v.sd);
+  if (v.heading == null || Math.abs(((h - v.heading) % 360 + 540) % 360 - 180) > 3) { v.heading = h; setHeading(v, h); }
 }
 
 async function loadMetro() {
@@ -238,9 +380,13 @@ function glideBus(v, lat, lon, routes) {
     if (a.d < 40 && b.d < 40 && b.s > a.s && b.s - a.s < jump * 2.5 + 200) { v.path = { r, s0: a.s, s1: b.s }; break; }
   }
 }
+let lastFrame = performance.now();
 function animate() {
   const now = performance.now();
+  const dt = Math.min(1000, now - lastFrame);
+  lastFrame = now;
   for (const store of [S.buses, S.trains]) for (const v of store.values()) {
+    if (v.plan) { stepPlanned(v, dt); continue; }
     if (!v.to) continue;
     const k = Math.min(1, (now - v.t0) / v.dur);
     const e = v.linear ? k : k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
@@ -257,6 +403,7 @@ async function refreshBuses() {
     const rows = await exportJson("tco-bus-vehicules-position-tr", { where: 'etat="En ligne"' });
     const seen = new Set();
     let moved = 0;
+    const tNow = Date.now();
     for (const b of rows) {
       if (!b.coordonnees || !b.idligne) continue;
       const id = String(b.idbus);
@@ -270,9 +417,14 @@ async function refreshBuses() {
         v.marker = L.marker([lat, lon], { pane: "buses", icon: vehicleIcon("bus", info.short, info.color, info.text, 24), keyboard: false })
           .bindTooltip("", { className: "tip", direction: "top", offset: [0, -14] }).addTo(map);
         S.buses.set(id, v);
-      } else if (v.lat !== lat || v.lon !== lon) {
-        glideBus(v, lat, lon, S.routes[b.idligne + "|" + b.sens]);
-        moved++;
+      }
+      const fresh = !v.gps || v.lat !== lat || v.lon !== lon || v.rkey !== b.idligne + "|" + b.sens;
+      v.rkey = b.idligne + "|" + b.sens;
+      if (fresh) {
+        if (v.gps) moved++;
+        v.gps = { lat, lon, t: tNow };
+        planBus(v); // horaire de marche recalé sur cette position GPS
+        if (!v.plan && v.lat != null) glideBus(v, lat, lon, S.routes[v.rkey]); // pas d'horaire : glissement d'un GPS à l'autre
       }
       // Sens de marche : le tracé de la ligne donne le cap le long de la rue ; le déplacement réel
       // depuis la position précédente tranche quand la ligne passe deux fois dans la même rue.
@@ -291,11 +443,12 @@ async function refreshBuses() {
       if (moveH != null) heading = routeH != null && gap(routeH, moveH) < 75 ? routeH : moveH;
       else if (routeH != null) heading = v.heading != null && gap(routeH, v.heading) > 120 ? v.heading : routeH;
       else heading = v.heading;
-      v.lat = lat; v.lon = lon; v.heading = heading;
-      setHeading(v, heading);
+      v.lat = lat; v.lon = lon;
+      if (!v.plan) { v.heading = heading; setHeading(v, heading); }
       const late = b.ecartsecondes;
       const lateTxt = typeof late === "number" && Math.abs(late) >= 60 ? `<br>Écart à l'horaire : ${late > 0 ? "+" : "−"}${Math.round(Math.abs(late) / 60)} min` : "";
-      v.marker.setTooltipContent(`<span class="badge" style="background:${esc(info.color)};color:${esc(info.text)}">${esc(info.short)}</span> vers <b>${esc(b.destination || "?")}</b>${lateTxt}`);
+      const how = v.plan ? "Position estimée d'après les horaires temps réel, recalée par GPS" : "Position GPS (sans horaire disponible)";
+      v.marker.setTooltipContent(`<span class="badge" style="background:${esc(info.color)};color:${esc(info.text)}">${esc(info.short)}</span> vers <b>${esc(b.destination || "?")}</b>${lateTxt}<br><span class="tip-sub">${how}</span>`);
     }
     for (const [id, v] of S.buses) if (!seen.has(id)) { v.marker.remove(); S.buses.delete(id); }
     // Nouveau paquet de positions : on mesure l'écart avec le précédent pour régler la durée du glissement.
@@ -437,6 +590,9 @@ const dur = ms => { const s = Math.max(0, Math.round(ms / 1000)); return s < 60 
 function updatePanel() {
   const now = Date.now();
   $("n-bus").textContent = S.busOk ? S.buses.size : "–";
+  let planned = 0;
+  for (const v of S.buses.values()) if (v.plan) planned++;
+  $("n-plan").textContent = S.busOk && S.passOk ? `dont ${planned} suivis à l'horaire entre deux GPS` : "";
   const err = (S.busErr && !S.busOk) || (S.metroErr && !S.metroOk);
   const stale = S.busOk && now - S.busOk > 60000;
   const st = $("status");
@@ -477,10 +633,15 @@ function updatePanel() {
   refreshMetroPassages();
   // Tracés (le premier chargement prend quelques secondes, ensuite ils sont gardés une semaine)
   loadMetro().catch(e => console.warn("métro", e));
-  loadBusShapes().then(() => refreshBuses()).catch(e => console.warn("tracés bus", e));
+  loadBusShapes()
+    .then(() => refreshBuses())
+    .then(() => loadBusStops())
+    .then(() => refreshBusPassages())
+    .catch(e => console.warn("tracés / arrêts bus", e));
+  setInterval(() => { if (!document.hidden) refreshBusPassages(); }, PASS_MS);
   setInterval(() => { if (!document.hidden) refreshBuses(); }, BUS_MS);
   setInterval(() => { if (!document.hidden) refreshMetroPassages(); }, METRO_MS);
   setInterval(() => { if (!document.hidden && S.metro.length && S.metroOk) renderTrains(); }, 1000);
   setInterval(updatePanel, 1000); // le décompte avance chaque seconde
-  document.addEventListener("visibilitychange", () => { if (!document.hidden) { refreshBuses(); refreshMetroPassages(); } });
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) { refreshBuses(); refreshMetroPassages(); refreshBusPassages(); } });
 })();

@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
-<link rel="stylesheet" href="carte.css?v=9">
+<link rel="stylesheet" href="carte.css?v=10">
 </head>
 <body>
 <div id="map"></div>
@@ -24,6 +24,7 @@
     <span><b id="n-bus">–</b> bus</span>
     <span><b id="n-metro">–</b> métros</span>
   </div>
+  <div class="p-plan" id="n-plan"></div>
   <div class="p-gps" id="gps" hidden>
     <div class="g-row"><span class="g-lbl">Positions GPS reçues</span><b id="gps-last">–</b></div>
     <div class="g-sub" id="gps-ago"></div>
@@ -32,7 +33,7 @@
     <div class="g-sub" id="gps-when"></div>
   </div>
   <div class="p-status" id="status">Chargement…</div>
-  <div class="p-note">Bus : position GPS du STAR, publiée environ toutes les minutes ; les bus roulent en continu d'une position à la suivante. Métro : position estimée d'après les horaires de passage en station.</div>
+  <div class="p-note">Bus : entre deux positions GPS du STAR, chaque bus avance selon ses heures de passage prévues aux arrêts suivants, puis se recale sur le GPS suivant. Métro : position estimée d'après les horaires de passage en station.</div>
   <a class="p-back" href="../">‹ Prochains passages</a>
 </aside>
 
@@ -41,6 +42,6 @@
 </button>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-<script src="carte.js?v=9"></script>
+<script src="carte.js?v=10"></script>
 </body>
 </html>
