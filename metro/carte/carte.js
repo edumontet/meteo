@@ -3,9 +3,8 @@
 "use strict";
 
 const API = "https://data.explore.star.fr/api/explore/v2.1/catalog/datasets/";
-const BUS_MS = 10000;        // positions des bus : mises à jour toutes les ~10 s côté STAR
+const BUS_MS = 5000;         // on interroge souvent pour attraper chaque nouveau paquet de positions
 const METRO_MS = 20000;      // heures de passage du métro
-const ANIM_MS = 2500;        // glissement d'une position à la suivante
 const CACHE_DAYS = 7;
 const HIDDEN_FAMILIES = ["Transport scolaire", "Evènementiel", "Covoiturage", "BreizhGo", "Spéciale"];
 
@@ -110,7 +109,8 @@ const S = {
   buses: new Map(),   // idbus -> état d'affichage
   trains: new Map(),
   passages: [],       // métro : { idarret, sens, arr, dep }
-  busOk: 0, metroOk: 0, busErr: null, metroErr: null
+  busOk: 0, metroOk: 0, busErr: null, metroErr: null,
+  busInterval: 45000, lastPacket: 0
 };
 
 // ---------- Lignes ----------
@@ -214,19 +214,39 @@ function moveTo(v, lat, lon, animate) {
   const cur = v.marker.getLatLng();
   v.from = animate ? [cur.lat, cur.lng] : [lat, lon];
   v.to = [lat, lon];
+  v.path = null;
   v.t0 = performance.now();
+}
+// Le STAR publie toutes les positions de bus d'un coup, par paquets espacés de 10 à 30 s.
+// Plutôt que de faire sauter les bus à chaque paquet, on les fait rouler à vitesse constante
+// jusqu'à leur nouvelle position pendant toute la durée qui sépare deux paquets, en suivant la rue
+// (le tracé de la ligne) quand c'est possible. La carte a ainsi un paquet de retard, mais tout bouge en continu.
+function glideBus(v, lat, lon, routes) {
+  const cur = v.marker.getLatLng();
+  const jump = Math.hypot((lon - cur.lng) * KX, (lat - cur.lat) * KY);
+  v.t0 = performance.now();
+  v.dur = S.busInterval;
+  v.linear = true;
+  v.path = null;
+  if (jump > 2500) { v.from = v.to = [lat, lon]; v.marker.setLatLng([lat, lon]); v.to = null; return; } // téléportation (changement de service)
+  v.from = [cur.lat, cur.lng];
+  v.to = [lat, lon];
+  for (const r of routes || []) {
+    const a = project(r, cur.lng, cur.lat), b = project(r, lon, lat);
+    if (a.d < 40 && b.d < 40 && b.s > a.s && b.s - a.s < jump * 2.5 + 200) { v.path = { r, s0: a.s, s1: b.s }; break; }
+  }
 }
 function animate() {
   const now = performance.now();
   for (const store of [S.buses, S.trains]) for (const v of store.values()) {
     if (!v.to) continue;
     const k = Math.min(1, (now - v.t0) / v.dur);
-    const e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
-    v.marker.setLatLng([v.from[0] + (v.to[0] - v.from[0]) * e, v.from[1] + (v.to[1] - v.from[1]) * e]);
+    const e = v.linear ? k : k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+    if (v.path) v.marker.setLatLng(pointAt(v.path.r, v.path.s0 + (v.path.s1 - v.path.s0) * e));
+    else v.marker.setLatLng([v.from[0] + (v.to[0] - v.from[0]) * e, v.from[1] + (v.to[1] - v.from[1]) * e]);
     if (k >= 1) v.to = null;
   }
   requestAnimationFrame(animate);
-  startLocation();
 }
 
 // ---------- Bus ----------
@@ -234,6 +254,7 @@ async function refreshBuses() {
   try {
     const rows = await exportJson("tco-bus-vehicules-position-tr", { where: 'etat="En ligne"' });
     const seen = new Set();
+    let moved = 0;
     for (const b of rows) {
       if (!b.coordonnees || !b.idligne) continue;
       const id = String(b.idbus);
@@ -243,12 +264,13 @@ async function refreshBuses() {
       let v = S.buses.get(id);
       if (!v || v.line !== b.idligne) {
         if (v) v.marker.remove();
-        v = { line: b.idligne, dur: ANIM_MS };
+        v = { line: b.idligne, dur: S.busInterval };
         v.marker = L.marker([lat, lon], { pane: "buses", icon: vehicleIcon("bus", info.short, info.color, info.text, 24), keyboard: false })
           .bindTooltip("", { className: "tip", direction: "top", offset: [0, -14] }).addTo(map);
         S.buses.set(id, v);
       } else if (v.lat !== lat || v.lon !== lon) {
-        moveTo(v, lat, lon, true);
+        glideBus(v, lat, lon, S.routes[b.idligne + "|" + b.sens]);
+        moved++;
       }
       // Sens de marche : le tracé de la ligne donne le cap le long de la rue ; le déplacement réel
       // depuis la position précédente tranche quand la ligne passe deux fois dans la même rue.
@@ -274,6 +296,12 @@ async function refreshBuses() {
       v.marker.setTooltipContent(`<span class="badge" style="background:${esc(info.color)};color:${esc(info.text)}">${esc(info.short)}</span> vers <b>${esc(b.destination || "?")}</b>${lateTxt}`);
     }
     for (const [id, v] of S.buses) if (!seen.has(id)) { v.marker.remove(); S.buses.delete(id); }
+    // Nouveau paquet de positions : on mesure l'écart avec le précédent pour régler la durée du glissement.
+    if (moved) {
+      const t = Date.now();
+      if (S.lastPacket) S.busInterval = Math.max(8000, Math.min(90000, 0.5 * S.busInterval + 0.5 * (t - S.lastPacket)));
+      S.lastPacket = t;
+    }
     S.busOk = Date.now(); S.busErr = null;
   } catch (e) {
     S.busErr = e;
@@ -416,6 +444,7 @@ function updatePanel() {
 // ---------- Démarrage ----------
 (async function start() {
   requestAnimationFrame(animate);
+  startLocation();
   try { await loadLines(); } catch (e) { S.busErr = e; updatePanel(); }
   refreshBuses();
   refreshMetroPassages();
