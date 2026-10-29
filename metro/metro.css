@@ -155,8 +155,8 @@ body[data-tab="bus"] .ico-metro { display: none; }
 .favs-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
 .favs-list li { display: flex; flex-direction: column; gap: 4px; padding: 10px 0; border-top: 1px solid var(--line); cursor: pointer; }
 .f-top { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.f-times { display: grid; grid-template-columns: 1fr 1fr; align-items: baseline; gap: 8px; padding-left: 44px; }
-.f-next { font-size: 16px; font-weight: 700; color: var(--soft); white-space: nowrap; }
+.f-times { display: grid; grid-template-columns: auto 1fr; align-items: baseline; gap: 8px; padding-left: 44px; }
+.f-next { text-align: right; font-size: 15px; font-weight: 700; color: var(--soft); white-space: nowrap; }
 .favs-list li:first-child { border-top: 0; }
 .favs-list li.on .f-name { color: #fff; }
 .f-tag {

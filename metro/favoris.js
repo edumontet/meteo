@@ -121,7 +121,7 @@
         if (!(f.routes || []).length) subTxt = "Pas de bus direct";
       }
       const second = n[1];
-      nxt.textContent = data.lastOk && second ? `(suivant ${fmt((second.time - now) / 1000)})` : "";
+      nxt.textContent = data.lastOk && second ? `(puis ${fmt((second.time - now) / 1000)})` : "";
       sub.textContent = subTxt;
 
       if (!data.lastOk) { when.className = "f-when none"; when.textContent = "…"; }
