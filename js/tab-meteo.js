@@ -17,10 +17,10 @@ export async function render(el, { place }) {
   renderRadar(el.querySelector("#m-radar"), place);
 
   const url = `https://api.open-meteo.com/v1/forecast?latitude=${place.lat}&longitude=${place.lon}` +
-    `&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,snowfall_sum,precipitation_probability_max,wind_gusts_10m_max,wind_speed_10m_max` +
+    `&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,snowfall_sum,precipitation_probability_max,wind_gusts_10m_max,wind_speed_10m_max,wind_direction_10m_dominant,uv_index_max` +
     `&minutely_15=precipitation&past_minutely_15=2&forecast_minutely_15=10` +
-    `&hourly=precipitation,precipitation_probability` +
-    `&current=temperature_2m,weather_code` +
+    `&hourly=precipitation,precipitation_probability,wind_speed_10m,wind_gusts_10m,wind_direction_10m,uv_index` +
+    `&current=temperature_2m,weather_code,wind_speed_10m,wind_gusts_10m,wind_direction_10m,uv_index` +
     `&timezone=Europe%2FParis&past_days=1&forecast_days=7&timeformat=unixtime`;
   let data;
   try {
@@ -50,7 +50,9 @@ function renderDays(box, data) {
     return {
       label: labels[i], date: new Date(t * 1000), txt, kind,
       min: d.temperature_2m_min[i], max: d.temperature_2m_max[i],
-      rain: pr, prob: d.precipitation_probability_max?.[i], gust: d.wind_gusts_10m_max?.[i], snowTxt
+      rain: pr, prob: d.precipitation_probability_max?.[i], gust: d.wind_gusts_10m_max?.[i], snowTxt,
+      wind: d.wind_speed_10m_max?.[i], dir: d.wind_direction_10m_dominant?.[i], uv: d.uv_index_max?.[i],
+      ...dayHours(data, new Date(t * 1000))
     };
   });
   let sel = 1;
@@ -65,20 +67,146 @@ function renderDays(box, data) {
           </button>`).join("")}
       </div>
       ${rainDay(data, s.date, s.label)}
+      ${windDay(data, s.date, s.label)}
       ${stormBox(d)}
       <section class="card" style="margin-top:16px">
         <div class="card-head"><h2>${s.label}</h2><span class="sub">${dayShort(s.date)}</span></div>
         <p class="txt">${esc(s.txt)}${s.label === "Aujourd'hui" && data.current ? ` · ${nf(data.current.temperature_2m)}° en ce moment` : ""}</p>
+        ${s.label === "Aujourd'hui" && data.current ? nowStrip(data.current) : ""}
         <div class="tiles">
           <div class="tile"><span class="k">Température min</span><span class="v cold" style="font-size:26px">${nf(s.min)}°</span></div>
           <div class="tile"><span class="k">Température max</span><span class="v warm" style="font-size:26px">${nf(s.max)}°</span></div>
           <div class="tile"><span class="k">Cumul de pluie</span><span class="v" style="font-size:20px">${nf(s.rain, 1)} mm</span>${s.label !== "Hier" && s.prob != null ? `<span class="s">risque ${nf(s.prob)} %</span>` : ""}</div>
-          <div class="tile"><span class="k">Risque de neige</span><span class="v" style="font-size:20px">${s.snowTxt}</span>${s.gust != null ? `<span class="s">rafales ${nf(s.gust)} km/h</span>` : ""}</div>
+          <div class="tile"><span class="k">Risque de neige</span><span class="v" style="font-size:20px">${s.snowTxt}</span></div>
+          <div class="tile"><span class="k">Vent moyen</span><span class="v" style="font-size:20px">${s.windMin != null ? `${nf(s.windMin)} à ${nf(s.wind)}` : nf(s.wind)} <small style="font-size:13px">km/h</small></span><span class="s">${s.dir != null ? "surtout " + windFrom(s.dir) : ""}</span></div>
+          <div class="tile"><span class="k">Rafales</span><span class="v" style="font-size:20px;color:${STORM[stormLevel(s.gust ?? 0)].col}">${s.gustMin != null ? `${nf(s.gustMin)} à ${nf(s.gust)}` : nf(s.gust)} <small style="font-size:13px">km/h</small></span><span class="s">${s.gustAt ? "max vers " + s.gustAt : ""}</span></div>
+          <div class="tile" style="grid-column:1 / -1">${uvTile(s)}</div>
         </div>
       </section>`;
     box.querySelectorAll(".day").forEach(b => b.addEventListener("click", () => { sel = +b.dataset.i; draw(); }));
   };
   draw();
+}
+
+/* ---------- Vent et UV ---------- */
+const DIRS = ["du nord", "du nord-est", "d'est", "du sud-est", "du sud", "du sud-ouest", "d'ouest", "du nord-ouest"];
+const windFrom = deg => DIRS[Math.round(((deg % 360) + 360) % 360 / 45) % 8];
+// Mots selon le vent moyen (échelle de Beaufort simplifiée)
+const windWord = v => v < 12 ? "faible" : v < 29 ? "modéré" : v < 39 ? "assez fort" : v < 62 ? "fort" : "très fort";
+const UV = [
+  { max: 2, word: "faible", col: "#4CC38A" },
+  { max: 5, word: "modéré", col: "#E8C14A" },
+  { max: 7, word: "élevé", col: "#FF9A4D" },
+  { max: 10, word: "très élevé", col: "#E5484D" },
+  { max: 99, word: "extrême", col: "#B56CFF" }
+];
+const uvLevel = v => UV.find(u => Math.round(v ?? 0) <= u.max);
+const hourTxt = ms => new Date(ms).toLocaleTimeString("fr-FR", { hour: "numeric", timeZone: "Europe/Paris" }).replace(/\s/g, "").replace(/h?$/, "h");
+
+// Heures d'un jour (minuit à minuit, heure de Paris) : vent mini/maxi, heure des rafales max, UV au fil de la journée
+function dayHours(data, date) {
+  const h = data.hourly;
+  if (!h?.time || !h.wind_speed_10m) return {};
+  const start = parisMidnight(date).getTime(), end = parisMidnight(new Date(start + 30 * 3600000)).getTime();
+  const idx = [];
+  h.time.forEach((t, i) => { if (t * 1000 >= start && t * 1000 < end) idx.push(i); });
+  if (!idx.length) return {};
+  const ws = idx.map(i => h.wind_speed_10m[i]).filter(v => v != null);
+  const gs = idx.map(i => h.wind_gusts_10m?.[i]).filter(v => v != null);
+  let gi = idx[0];
+  idx.forEach(i => { if ((h.wind_gusts_10m?.[i] ?? -1) > (h.wind_gusts_10m?.[gi] ?? -1)) gi = i; });
+  const uvs = idx.map(i => ({ ms: h.time[i] * 1000, v: h.uv_index?.[i] ?? 0 }));
+  const sunny = uvs.filter(x => x.v >= 0.5);
+  const peak = uvs.reduce((a, x) => x.v > a.v ? x : a, uvs[0]);
+  return {
+    windMin: ws.length ? Math.min(...ws) : null,
+    gustMin: gs.length ? Math.min(...gs) : null,
+    gustAt: gs.length ? hourTxt(h.time[gi] * 1000) : null,
+    uvPeakAt: peak && peak.v >= 0.5 ? hourTxt(peak.ms) : null,
+    uvFrom: sunny.length ? hourTxt(sunny[0].ms) : null,
+    uvTo: sunny.length ? hourTxt(sunny[sunny.length - 1].ms + 3600000) : null
+  };
+}
+
+function uvTile(s) {
+  const L = uvLevel(s.uv);
+  const span = s.uvFrom ? `UV de ${s.uvFrom} à ${s.uvTo}${s.uvPeakAt ? `, pic vers ${s.uvPeakAt}` : ""}` : "Pas d'UV notable";
+  return `<span class="k">Indice UV</span>
+    <span style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap">
+      <span class="v" style="font-size:20px">0 à ${nf(s.uv)}</span>
+      <span style="font-size:13px;font-weight:800;color:${L.col}">max ${L.word}</span>
+    </span>
+    <span class="s">${span}${Math.round(s.uv ?? 0) >= 3 ? " · protection conseillée" : ""}</span>`;
+}
+
+// Bandeau « en ce moment » : vent, rafales, UV
+function nowStrip(c) {
+  if (c.wind_speed_10m == null) return "";
+  const L = uvLevel(c.uv_index);
+  const arrow = c.wind_direction_10m != null
+    ? `<svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" style="transform:rotate(${(c.wind_direction_10m + 180) % 360}deg);flex-shrink:0"><path d="M12 3l6 16-6-4-6 4z" fill="#5BB8FF"/></svg>` : "";
+  const item = (k, v) => `<span style="display:flex;flex-direction:column;gap:1px;min-width:0"><span style="font-size:11px;color:#9AA8C2;font-weight:600">${k}</span><span style="font-size:15px;font-weight:800;display:flex;align-items:center;gap:5px">${v}</span></span>`;
+  return `<div style="display:grid;grid-template-columns:1.3fr 1fr 0.8fr;gap:8px;background:var(--card2);border-radius:14px;padding:10px 12px">
+    ${item("Vent en ce moment", `${arrow}${nf(c.wind_speed_10m)} km/h`)}
+    ${item("Rafales", `${nf(c.wind_gusts_10m)} km/h`)}
+    ${item("UV", `<span style="color:${L.col}">${nf(c.uv_index)}</span>`)}
+  </div>
+  ${c.wind_direction_10m != null ? `<p class="small" style="margin-top:-6px;color:#9AA8C2">Vent ${windWord(c.wind_speed_10m)} ${windFrom(c.wind_direction_10m)}.</p>` : ""}`;
+}
+
+/* ---------- Vent sur la journée ---------- */
+function windDay(data, date, label) {
+  const h = data.hourly;
+  if (!h?.time || !h.wind_speed_10m) return "";
+  const start = parisMidnight(date).getTime(), end = parisMidnight(new Date(start + 30 * 3600000)).getTime();
+  const now = Date.now();
+  const hours = [];
+  h.time.forEach((t, i) => {
+    const ms = t * 1000;
+    if (ms >= start && ms < end) hours.push({ ms, w: h.wind_speed_10m[i] ?? 0, g: h.wind_gusts_10m?.[i] ?? 0, dir: h.wind_direction_10m?.[i], past: ms + 3600000 <= now });
+  });
+  if (!hours.length) return "";
+  const isPast = hours.every(x => x.past);
+  const rest = label === "Aujourd'hui" ? hours.filter(x => !x.past) : hours;
+  const pool = rest.length ? rest : hours;
+  const top = pool.reduce((a, x) => x.g > a.g ? x : a, pool[0]);
+  const wMax = Math.max(...pool.map(x => x.w)), wMin = Math.min(...pool.map(x => x.w));
+  const word = wMin === wMax || windWord(wMin) === windWord(wMax) ? windWord(wMax) : `${windWord(wMin)} à ${windWord(wMax)}`;
+  const dirs = pool.filter(x => x.dir != null);
+  // direction dominante (moyenne vectorielle)
+  let dirTxt = "";
+  if (dirs.length) {
+    const sx = dirs.reduce((a, x) => a + Math.sin(x.dir * Math.PI / 180), 0), sy = dirs.reduce((a, x) => a + Math.cos(x.dir * Math.PI / 180), 0);
+    dirTxt = " " + windFrom(Math.atan2(sx, sy) * 180 / Math.PI);
+  }
+  const lead = isPast
+    ? `Vent ${word}${dirTxt}, rafales jusqu'à ${nf(top.g)} km/h vers ${hourTxt(top.ms)}`
+    : `${label === "Aujourd'hui" && rest.length < hours.length ? "D'ici ce soir, vent" : "Vent"} ${word}${dirTxt}, rafales jusqu'à ${nf(top.g)} km/h vers ${hourTxt(top.ms)}`;
+
+  const W = 340, top0 = 4, H = 70, n = hours.length, cw = W / n;
+  const vmax = Math.max(40, ...hours.map(x => x.g)) * 1.08;
+  const Y = v => top0 + H - v / vmax * H;
+  const col = g => STORM[stormLevel(g)].col;
+  const bars = hours.map((x, i) => {
+    const op = x.past && !isPast ? ' opacity="0.35"' : "";
+    const xx = (i * cw + 1).toFixed(1), ww = (cw - 2).toFixed(1);
+    return `<rect x="${xx}" y="${Y(x.g).toFixed(1)}" width="${ww}" height="${(top0 + H - Y(x.g)).toFixed(1)}" rx="2" fill="${col(x.g)}" fill-opacity="0.35"${op}/>` +
+      `<rect x="${xx}" y="${Y(x.w).toFixed(1)}" width="${ww}" height="${(top0 + H - Y(x.w)).toFixed(1)}" rx="2" fill="#5BB8FF"${op}/>`;
+  }).join("");
+  // flèches de direction toutes les 3 heures (elles pointent là où va le vent)
+  const arrows = hours.map((x, i) => i % 3 === 1 && x.dir != null
+    ? `<g transform="translate(${(i * cw + cw / 2).toFixed(1)},${top0 + H + 13}) rotate(${(x.dir + 180) % 360})"${x.past && !isPast ? ' opacity="0.35"' : ""}><path d="M0,-6 L4,5 L0,2.5 L-4,5 Z" fill="#C9D3E6"/></g>` : "").join("");
+  const grid = [20, 40, 60, 80, 100].filter(v => v < vmax).map(v => `<line x1="0" x2="${W}" y1="${Y(v).toFixed(1)}" y2="${Y(v).toFixed(1)}" stroke="#22304D" stroke-width="1"/><text x="${W}" y="${(Y(v) - 2).toFixed(1)}" text-anchor="end" fill="#6B7894" font-size="9" font-weight="700">${v}</text>`).join("");
+  const ticks = [0, 6, 12, 18, 24].map(k => `<text x="${(k / 24 * W).toFixed(1)}" y="${top0 + H + 36}" text-anchor="${k === 0 ? "start" : k === 24 ? "end" : "middle"}" fill="#9AA8C2" font-size="11" font-weight="600">${k}h</text>`).join("");
+  const X = ms => (ms - start) / (end - start) * W;
+  const nowLine = !isPast && now > start && now < end ? `<line x1="${X(now).toFixed(1)}" x2="${X(now).toFixed(1)}" y1="0" y2="${top0 + H}" stroke="#EAF0FA" stroke-width="2"/>` : "";
+  return `
+    <section class="card" aria-label="Vent sur la journée" style="margin-top:16px;gap:10px">
+      <div class="card-head"><h2>${isPast ? "Le vent d'hier" : "Vent dans la journée"}</h2><span class="sub">rafales max ${nf(Math.max(...hours.map(x => x.g)))} km/h</span></div>
+      <p style="font-size:17px;font-weight:800;line-height:1.3">${esc(lead)}.</p>
+      <svg class="chart" viewBox="0 0 ${W} ${top0 + H + 40}" role="img" aria-label="${esc(lead)}">${grid}${bars}${nowLine}${arrows}${ticks}</svg>
+      <div class="legend"><span><i style="background:#5BB8FF"></i>Vent moyen</span><span><i style="background:#4CC38A;opacity:.5"></i>Rafales (couleur selon la force)</span><span>km/h</span></div>
+    </section>`;
 }
 
 /* ---------- Risque de pluie sur la journée ---------- */

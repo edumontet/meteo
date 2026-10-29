@@ -4,10 +4,11 @@ Web app météo pour iPhone, en français, sans installation ni compte : une pag
 
 ## Les onglets
 
-- **Météo** : hier, aujourd'hui et demain (min/max, pluie, risque de neige), pluie dans l'heure par quart d'heure, radar animé et cartes de prévision (pluie, nuages), Lune (phase, croissante/décroissante, compte à rebours), saint du jour, marées de Saint-Malo (horaires, courbe, coefficients, prochaines grandes marées).
+- **Météo** : hier, aujourd'hui et demain (min/max, pluie, risque de neige, vent moyen et rafales, indice UV), vent et UV en ce moment, vent heure par heure, pluie dans l'heure par quart d'heure, radar animé et cartes de prévision (pluie, nuages), Lune (phase, croissante/décroissante, compte à rebours), saint du jour, marées de Saint-Malo (horaires, courbe, coefficients, prochaines grandes marées).
 - **Modèles** : comparaison AROME, ARPEGE, ECMWF et GFS (température sur 48 h, pluie), avec un indice de confiance.
 - **Orages** : carte des impacts de foudre en direct (Blitzortung) et risque d'orage sur 24 h.
 - **Soleil** : images du Soleil en direct (NASA SDO), éruptions, indice Kp, chances d'aurores en Bretagne, vent solaire.
+- **Bus** : lien vers l'appli Métro et bus de Rennes (voir plus bas).
 - **Champis** : indice champignons calculé pour ta position (pluie des 15 derniers jours, température et humidité du sol, gel, vent) sur 15 jours, avec la Lune à titre indicatif.
 
 ## Métro Rennes
