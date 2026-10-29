@@ -286,7 +286,7 @@ async function refreshMetroPassages() {
     let rows;
     const sel = { select: "idligne,sens,idarret,arrivee,depart", timezone: "Europe/Paris" };
     try {
-      rows = await exportJson("tco-metro-circulation-passages-tr", Object.assign({ where: "depart < now(minutes=25) or (depart is null and arrivee < now(minutes=25))" }, sel));
+      rows = await exportJson("tco-metro-circulation-passages-tr", Object.assign({ where: "depart < now(minutes=25) or depart is null" }, sel));
     } catch (e) {
       rows = await exportJson("tco-metro-circulation-passages-tr", sel);
     }

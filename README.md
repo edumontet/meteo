@@ -14,7 +14,9 @@ Web app météo pour iPhone, en français, sans installation ni compte : une pag
 
 Une deuxième web app vit dans le dossier `metro/`, à l'adresse `https://edumontet.github.io/meteo/metro/` : on choisit la ligne (A ou B), la station et la direction, et elle affiche dans combien de minutes et de secondes arrive la prochaine rame, puis les suivantes. Un onglet **Bus** fait la même chose pour le bus : on choisit l'arrêt de départ et l'arrêt d'arrivée, l'appli trouve les lignes directes et affiche le prochain bus dans le bon sens. Les choix sont mémorisés. Données temps réel du jeu « Prochains passages » métro et bus, et « Dessertes des parcours de bus » sur [STAR Data Explore](https://data.explore.star.fr) (licence ODbL), actualisées toutes les 30 s. Ajouter `?debug` à l'adresse (`…/metro/?debug#bus`) affiche les données brutes reçues.
 
-Elle s'installe à part sur l'écran d'accueil (Partager › Sur l'écran d'accueil depuis la page Métro).
+Une **carte en direct** (`metro/carte/`, pour ordinateur) montre sur un fond OpenStreetMap tout le réseau STAR aux couleurs des lignes, la position GPS de tous les bus en service et celle des rames de métro (estimée d'après les heures de passage en station), avec une flèche pour le sens de marche.
+
+L'appli s'installe à part sur l'écran d'accueil (Partager › Sur l'écran d'accueil depuis la page Métro).
 
 ## Mettre en ligne
 
