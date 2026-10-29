@@ -15,6 +15,11 @@
   const CACHE_DAYS = 7;
 
   const $ = id => document.getElementById(id);
+  // Les heures STAR arrivent parfois en « 2026-10-29 05:43:24+0100 », que Safari ne sait pas lire.
+  function parseTime(s) {
+    if (!s) return NaN;
+    return Date.parse(String(s).trim().replace(" ", "T").replace(/([+-]\d\d)(\d\d)$/, "$1:$2"));
+  }
   const debugOn = /[?&]debug/.test(location.search);
 
   const S = {
@@ -168,7 +173,7 @@
         const route = want[String(r.idarret) + "|" + String(r.idligne)];
         if (!route) return null;
         const raw = pick(r, ["depart", "arrivee"]) || pickLike(r, /depart|arriv/i);
-        const time = raw ? Date.parse(raw) : NaN;
+        const time = raw ? parseTime(raw) : NaN;
         if (isNaN(time)) return null;
         const info = S.lines[String(r.idligne)] || {};
         const prec = String(pick(r, ["precision"]) || "");

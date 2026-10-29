@@ -2,6 +2,12 @@
 // Données : jeu « Prochains passages applicables des lignes de métro du réseau STAR » (temps réel), STAR Data Explore.
 "use strict";
 
+// Les heures STAR arrivent parfois en « 2026-10-29 05:43:24+0100 », que Safari ne sait pas lire.
+function parseTime(s) {
+  if (!s) return NaN;
+  return Date.parse(String(s).trim().replace(" ", "T").replace(/([+-]\d\d)(\d\d)$/, "$1:$2"));
+}
+
 const DATASET = "tco-metro-circulation-passages-tr";
 const API = "https://data.explore.star.fr/api/explore/v2.1/catalog/datasets/" + DATASET;
 const REFRESH_MS = 30000;
@@ -60,7 +66,7 @@ function parseRecord(r) {
   const station = pick(r, ["nomarret", "arret", "nomstation", "station"]) || pickLike(r, /arret|station/i);
   const dest = pick(r, ["destination", "nomdestination", "direction", "terminus"]) || pickLike(r, /dest|termin/i);
   const rawTime = pick(r, ["arrivee", "depart", "heurearrivee", "heuredepart", "arrival", "departure"]) || pickLike(r, /arriv|depart/i);
-  const time = rawTime ? Date.parse(rawTime) : NaN;
+  const time = rawTime ? parseTime(rawTime) : NaN;
   if (!station || isNaN(time)) return null;
 
   let line = null;
