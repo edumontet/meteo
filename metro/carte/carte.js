@@ -110,7 +110,9 @@ const S = {
   trains: new Map(),
   passages: [],       // métro : { idarret, sens, arr, dep }
   busOk: 0, metroOk: 0, busErr: null, metroErr: null,
-  busInterval: 45000, lastPacket: 0
+  busInterval: 45000, lastPacket: 0,
+  packets: 0,         // nombre de nouveaux paquets de positions vus depuis l'ouverture
+  loadedAt: 0         // heure du tout premier chargement des positions
 };
 
 // ---------- Lignes ----------
@@ -301,7 +303,9 @@ async function refreshBuses() {
       const t = Date.now();
       if (S.lastPacket) S.busInterval = Math.max(8000, Math.min(90000, 0.5 * S.busInterval + 0.5 * (t - S.lastPacket)));
       S.lastPacket = t;
+      S.packets++;
     }
+    if (!S.loadedAt && rows.length) S.loadedAt = Date.now();
     S.busOk = Date.now(); S.busErr = null;
   } catch (e) {
     S.busErr = e;
@@ -429,16 +433,39 @@ function startLocation() {
 $("locate").addEventListener("click", () => { if (me.pos) map.setView(me.pos, Math.max(map.getZoom(), 16)); });
 
 // ---------- Panneau ----------
+const dur = ms => { const s = Math.max(0, Math.round(ms / 1000)); return s < 60 ? s + " s" : Math.floor(s / 60) + " min " + String(s % 60).padStart(2, "0") + " s"; };
 function updatePanel() {
+  const now = Date.now();
   $("n-bus").textContent = S.busOk ? S.buses.size : "–";
   const err = (S.busErr && !S.busOk) || (S.metroErr && !S.metroOk);
-  const stale = S.busOk && Date.now() - S.busOk > 60000;
+  const stale = S.busOk && now - S.busOk > 60000;
   const st = $("status");
   st.classList.toggle("err", !!(err || stale));
   document.querySelector(".live").classList.toggle("off", !!(err || stale));
   if (err) st.textContent = "Données STAR injoignables, nouvel essai en cours…";
-  else if (stale) st.textContent = "Connexion perdue · positions de " + hhmmss(S.busOk);
-  else if (S.busOk) st.textContent = "Mis à jour à " + hhmmss(S.busOk);
+  else if (stale) st.textContent = "Connexion perdue · dernière vérification à " + hhmmss(S.busOk);
+  else if (S.busOk) st.textContent = "Vérifié à " + hhmmss(S.busOk) + (S.packets >= 2 ? " · un paquet toutes les ≈ " + dur(S.busInterval) : "");
+
+  // Décompte des positions GPS exactes des bus : quand le dernier paquet est arrivé, quand arrive le suivant.
+  const last = S.lastPacket || S.loadedAt;
+  const gps = $("gps");
+  gps.hidden = !last;
+  if (!last) return;
+  $("gps-last").textContent = hhmmss(last);
+  $("gps-ago").textContent = (S.lastPacket ? "il y a " : "à l'ouverture, il y a ") + dur(now - last);
+  const expected = last + S.busInterval;
+  const left = expected - now;
+  const approx = S.packets < 2 ? "≈ " : ""; // rythme pas encore mesuré : estimation
+  const due = left <= 0;
+  gps.classList.toggle("due", due);
+  if (!due) {
+    $("gps-next").textContent = "dans " + approx + dur(left);
+    $("gps-when").textContent = "vers " + hhmmss(expected);
+  } else {
+    $("gps-next").textContent = "d'un instant à l'autre";
+    $("gps-when").textContent = "attendu depuis " + dur(-left);
+  }
+  $("gps-bar").style.width = Math.max(0, Math.min(100, (now - last) / S.busInterval * 100)) + "%";
 }
 
 // ---------- Démarrage ----------
@@ -454,6 +481,6 @@ function updatePanel() {
   setInterval(() => { if (!document.hidden) refreshBuses(); }, BUS_MS);
   setInterval(() => { if (!document.hidden) refreshMetroPassages(); }, METRO_MS);
   setInterval(() => { if (!document.hidden && S.metro.length && S.metroOk) renderTrains(); }, 1000);
-  setInterval(updatePanel, 5000);
+  setInterval(updatePanel, 1000); // le décompte avance chaque seconde
   document.addEventListener("visibilitychange", () => { if (!document.hidden) { refreshBuses(); refreshMetroPassages(); } });
 })();

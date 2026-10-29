@@ -17,6 +17,16 @@ body { font-family: Manrope, system-ui, -apple-system, sans-serif; background: #
 .p-counts b { font-size: 20px; font-weight: 800; color: #fff; margin-right: 2px; }
 .p-status { font-size: 12px; color: #9AA8C2; }
 .p-status.err { color: #F6A5A7; }
+/* Décompte des positions GPS des bus */
+.p-gps { display: flex; flex-direction: column; gap: 2px; padding: 9px 10px; border-radius: 10px; background: rgba(255, 255, 255, 0.06); }
+.g-row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 12px; color: #C9D3E6; }
+.g-row b { font-size: 15px; font-weight: 800; color: #fff; white-space: nowrap; }
+.g-sub { font-size: 11px; color: #8796B2; text-align: right; }
+.g-bar { height: 4px; margin: 6px 0 5px; border-radius: 2px; background: rgba(255, 255, 255, 0.12); overflow: hidden; }
+.g-bar i { display: block; height: 100%; width: 0; border-radius: 2px; background: #4CC38A; transition: width 1s linear; }
+.p-gps.due .g-bar i { background: #F5B94A; animation: due 1s ease-in-out infinite alternate; }
+.p-gps.due #gps-next { color: #F5B94A; }
+@keyframes due { from { opacity: 1; } to { opacity: 0.45; } }
 .p-note { font-size: 11px; line-height: 1.45; color: #7D8BA6; }
 .p-back { font-size: 12px; font-weight: 700; color: #5BB8FF; text-decoration: none; }
 
