@@ -43,6 +43,17 @@ Toutes gratuites et sans clé :
 
 HTML, CSS et JavaScript sans étape de build. Le fichier `js/tides-engine.js` est le prédicteur de marées Neaps empaqueté avec les données de Saint-Malo et Brest (`tools/build-tides.sh` pour le régénérer).
 
+## Mon plan (application indépendante)
+
+Le dossier `plan/` contient une web app pour se guider à pied sur la photo d'un plan (zoo, parc, salon…), à l'adresse `https://edumontet.github.io/meteo/plan/`. Elle s'installe à part sur l'écran d'accueil.
+
+1. On photographie le plan, puis on place ses 4 coins pour redresser la photo (prise de biais).
+2. On touche l'endroit où l'on est, puis la destination.
+3. **Calage** (une fois par plan) : téléphone à plat, on marche jusqu'à un repère reconnaissable et on le touche sur le plan. Le trajet mesuré (pas comptés par l'accéléromètre, direction donnée par la boussole) comparé au trajet sur le plan donne l'échelle et l'orientation du plan.
+4. Le triangle bleu suit ensuite les pas et la direction du téléphone ; le bandeau indique la distance à vol d'oiseau et le sens à prendre. « Je suis ici » corrige la position et affine le calage.
+
+Les plans et leur calage sont enregistrés dans le téléphone (rien n'est envoyé en ligne). Il faut autoriser « Mouvements et orientation » au premier lancement. Ajouter `?demo` à l'adresse permet de simuler le cap et les pas sur un ordinateur.
+
 ## Mon arrêt (application indépendante)
 
 Le dossier `sevrage/` contient une web app à part, sans lien avec la météo ni le métro, à l'adresse `https://edumontet.github.io/meteo/sevrage/`. Elle compte les jours sans alcool (depuis le 5 octobre 2026) et sans tabac (depuis le 18 octobre 2026), calcule les économies en direct (10 €/jour d'alcool, 13,50 €/jour de tabac) et propose un texte à lire pour chaque semaine, chaque mois puis chaque année, avec ses sources. Les dates et les montants sont fixés dans `sevrage/index.html`.

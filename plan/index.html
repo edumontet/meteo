@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#F3F4F6" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0F1318" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Mon plan">
+<title>Mon plan</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="plan.css">
+</head>
+<body>
+
+<!-- Écran 1 : accueil, photo du plan et plans enregistrés -->
+<section id="accueil" class="screen">
+  <div class="wrap">
+    <header class="intro">
+      <p class="kicker">Mon plan</p>
+      <h1>Où voulez-vous aller ?</h1>
+      <p class="lead">Prenez en photo le plan du lieu (zoo, parc, salon…), bien en entier. Vous pourrez le redresser ensuite.</p>
+    </header>
+
+    <label class="drop" for="in-photo">
+      <span class="drop-ic"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg></span>
+      <span class="drop-t">Photographier le plan</span>
+      <span class="drop-s">Ouvre l’appareil photo</span>
+    </label>
+    <input id="in-photo" class="sr" type="file" accept="image/*" capture="environment">
+
+    <label class="btn secondary" for="in-galerie">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/></svg>
+      Choisir une photo déjà prise
+    </label>
+    <input id="in-galerie" class="sr" type="file" accept="image/*">
+
+    <h2 class="sec">Plans enregistrés</h2>
+    <p id="liste-vide" class="muted">Aucun plan pour l’instant.</p>
+    <ul id="liste" class="liste"></ul>
+
+    <details class="aide">
+      <summary>Comment ça marche</summary>
+      <ol>
+        <li>Photographiez le plan, puis placez ses 4 coins pour le redresser.</li>
+        <li>Touchez l’endroit où vous êtes, puis celui où vous voulez aller.</li>
+        <li><strong>Calage</strong> (une seule fois par plan) : téléphone à plat devant vous, marchez jusqu’à un repère facile à reconnaître (croisement, coin de bâtiment), puis touchez-le sur le plan. L’appli en déduit le sens du plan et son échelle.</li>
+        <li>Le triangle bleu suit ensuite vos pas et la direction du téléphone. Quand vous reconnaissez un endroit, touchez « Je suis ici » pour corriger la position : le calage s’affine à chaque fois.</li>
+      </ol>
+      <p class="muted">Le comptage de pas dérive un peu (5 à 10 % de la distance) : recalez-vous de temps en temps. La boussole peut être perturbée près de structures métalliques.</p>
+    </details>
+  </div>
+</section>
+
+<!-- Écran 2 : redresser la photo -->
+<section id="redresser" class="screen" hidden>
+  <div class="bar">
+    <button class="icon-btn" id="r-retour" aria-label="Retour"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button>
+    <div>
+      <h1 class="bar-t">Redresser le plan</h1>
+      <p class="bar-s">Faites glisser les 4 ronds sur les coins du plan.</p>
+    </div>
+  </div>
+  <div class="r-zone"><canvas id="rcv" aria-label="Photo du plan avec les 4 coins à placer"></canvas></div>
+  <div class="r-foot">
+    <label class="field">
+      <span>Nom du plan</span>
+      <input id="nom" type="text" placeholder="Ex. : Zoo de la Bourbansais" autocomplete="off" enterkeyhint="done">
+    </label>
+    <button class="btn primary" id="r-ok">Redresser et continuer</button>
+    <button class="btn ghost" id="r-tel">Garder la photo telle quelle</button>
+  </div>
+</section>
+
+<!-- Écran 3 : le plan (position, destination, calage, guidage) -->
+<section id="carte" class="screen" hidden>
+  <canvas id="cv" aria-label="Plan"></canvas>
+
+  <div id="banner" class="banner">
+    <div id="b-ic" class="b-ic" aria-hidden="true"></div>
+    <div class="b-txt">
+      <p id="b-t" class="b-t"></p>
+      <p id="b-s" class="b-s"></p>
+    </div>
+  </div>
+
+  <button id="recentrer" class="fab" aria-label="Recentrer sur ma position" hidden>
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2" fill="currentColor"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+  </button>
+
+  <div id="sheet" class="sheet">
+    <p id="s-msg" class="s-msg"></p>
+    <div id="stats" class="stats" hidden>
+      <div><span>Pas</span><strong id="st-pas">0</strong></div>
+      <div><span>Distance</span><strong id="st-dist">0 m</strong></div>
+      <div><span>Cap</span><strong id="st-cap">–</strong></div>
+    </div>
+    <div id="actions" class="actions"></div>
+  </div>
+
+  <div id="demo" class="demo" hidden>
+    <label>Cap <input id="demo-cap" type="range" min="0" max="359" value="0"> <output id="demo-cap-v">0°</output></label>
+    <button class="btn small" id="demo-pas">+1 pas</button>
+    <button class="btn small" id="demo-10">+10 pas</button>
+  </div>
+</section>
+
+<div id="busy" class="busy" hidden><div class="spin" aria-hidden="true"></div><p id="busy-t">Redressement…</p></div>
+<div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+<script src="plan.js"></script>
+</body>
+</html>
