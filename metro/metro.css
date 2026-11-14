@@ -182,3 +182,24 @@ body[data-tab="bus"] .ico-metro { display: none; }
 .fav-btn.saved { color: #F4C76B; border-color: #6B5626; }
 .fav-btn.saved svg { fill: currentColor; }
 .fav-btn[hidden] { display: none; }
+
+/* « Je descends à » : rappel de la direction */
+.dir-hint { font-size: 13px; color: var(--muted); margin-top: 6px; }
+
+/* Où monter dans la rame */
+.train-text { margin-top: 4px; }
+.train-wrap svg { width: 100%; height: auto; display: block; }
+.t-car { fill: #1C2A47; stroke: var(--line2); stroke-width: 1.5; }
+.t-win { fill: #0F182B; }
+.t-joint { fill: var(--line2); }
+.t-door { fill: #2A3A5C; stroke: var(--muted); stroke-width: 1; transition: fill .2s; }
+.t-door.on { fill: var(--c); stroke: var(--c-soft); }
+.t-hit { fill: transparent; cursor: pointer; }
+.t-rail { stroke: var(--line2); stroke-width: 2; }
+.t-arrow { fill: none; stroke: var(--muted); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.t-dot { fill: #FF3B30; animation: t-blink 1s ease-in-out infinite; }
+.t-pulse { fill: #FF3B30; opacity: .35; transform-box: fill-box; transform-origin: center; animation: t-pulse 1.4s ease-out infinite; }
+@keyframes t-blink { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
+@keyframes t-pulse { 0% { transform: scale(.5); opacity: .6; } 100% { transform: scale(1.8); opacity: 0; } }
+.train-text { font-size: 18px; font-weight: 700; text-align: center; color: var(--text); }
+.train-help { font-size: 12px; color: var(--muted); text-align: center; }

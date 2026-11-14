@@ -13,7 +13,7 @@
   let favs = [];
   try { favs = JSON.parse(localStorage.getItem("favoris") || "[]").filter(f => f && f.t); } catch (e) {}
   const save = () => { try { localStorage.setItem("favoris", JSON.stringify(favs)); } catch (e) {} };
-  const keyOf = f => f.t === "metro" ? `m|${f.line}|${f.station}|${f.dir}` : `b|${f.from}|${f.to}`;
+  const keyOf = f => f.t === "metro" ? `m|${f.line}|${f.station}|${f.dest || f.dir}` : `b|${f.from}|${f.to}`;
 
   const data = { metro: [], bus: [], lastOk: 0, loading: false };
   let editing = false;
@@ -108,7 +108,7 @@
         tag.className = "f-tag metro-" + f.line.toLowerCase();
         tag.textContent = f.line;
         tag.removeAttribute("style");
-        name.textContent = `${f.station} → ${f.dir}`;
+        name.textContent = `${f.station} → ${f.dest || f.dir}`;
         subTxt = "Métro " + f.line;
       } else {
         const info = first ? lines[first.idligne] || {} : {};
@@ -164,7 +164,7 @@
   }
   $("fav-metro").addEventListener("click", () => {
     const m = window.metroGet();
-    toggle({ t: "metro", line: m.line, station: m.station, dir: m.dir });
+    toggle({ t: "metro", line: m.line, station: m.station, dir: m.dir, dest: m.dest });
   });
   $("fav-bus").addEventListener("click", () => {
     const b = window.busGet();
@@ -181,7 +181,7 @@
     const f = favs[Number(li.dataset.i)];
     if (f.t === "metro") {
       if (location.hash !== "#metro") location.hash = "#metro";
-      window.metroSet(f.line, f.station, f.dir);
+      window.metroSet(f.line, f.station, f.dir, f.dest);
     } else {
       if (location.hash !== "#bus") location.hash = "#bus";
       window.busSet(f.from, f.to);
