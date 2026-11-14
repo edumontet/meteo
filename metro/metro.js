@@ -30,7 +30,8 @@ const metroVisible = () => document.visibilityState === "visible" && document.bo
 const state = {
   line: "A",
   station: null,
-  dir: null,          // nom du terminus choisi
+  dir: null,          // terminus vers lequel on roule (déduit de la station d'arrivée)
+  dest: null,         // station où l'on descend
   passages: [],       // { line, station, dest, time (ms), precision }
   extras: { A: [], B: [] }, // stations vues dans les données mais absentes de la liste ci-dessus
   lastOk: 0,
@@ -176,22 +177,124 @@ function fillStations() {
   sel.value = state.station;
 }
 
-function fillDirections() {
+// Liste « Je descends à » : toutes les autres stations de la ligne, la direction s'en déduit.
+function fillDests() {
   const list = LINES[state.line];
   const ends = [list[0], list[list.length - 1]];
-  const sel = $("direction");
-  sel.innerHTML = ends.map(n => `<option value="${escapeHtml(n)}">Vers ${escapeHtml(n)}</option>`).join("");
-  if (!ends.includes(state.dir)) {
-    const saved = load("dir." + state.line);
-    state.dir = ends.includes(saved) ? saved : ends[1];
+  const si = indexIn(state.line, state.station);
+  const choices = list.filter((n, i) => i !== si);
+  const sel = $("dest");
+  sel.innerHTML = choices.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join("");
+  if (!choices.includes(state.dest)) {
+    const saved = load("dest." + state.line);
+    if (choices.includes(saved)) state.dest = saved;
+    else { // sinon le terminus de l'ancienne direction, ou le terminus le plus loin
+      const oldDir = ends.includes(state.dir) ? state.dir : load("dir." + state.line);
+      state.dest = choices.includes(oldDir) ? oldDir : (si >= 0 && si > (list.length - 1) / 2 ? ends[0] : ends[1]);
+    }
   }
-  sel.value = state.dir;
+  sel.value = state.dest;
+  updateDir();
 }
+
+function updateDir() {
+  const list = LINES[state.line];
+  const ends = [list[0], list[list.length - 1]];
+  const si = indexIn(state.line, state.station), di = indexIn(state.line, state.dest);
+  state.dir = si >= 0 && di >= 0 ? (di > si ? ends[1] : ends[0]) : (state.dest === ends[0] ? ends[0] : ends[1]);
+  $("dir-hint").textContent = "Direction " + state.dir;
+  renderTrain();
+}
+
+// ---------- Où monter dans la rame ----------
+// Position de l'escalator de sortie, par ligne → station d'arrivée → terminus de la direction.
+// Valeur : 0 = porte de tête … DOORS-1 = porte de queue. Tu complètes au fil des trajets.
+// Ce que tu touches dans l'appli est gardé sur le téléphone et passe avant ce tableau.
+const DOORS = 4;
+const SORTIES = {
+  A: {
+    // "Clemenceau": { "La Poterie": 0, "J.F. Kennedy": 3 },
+  },
+  B: {
+  }
+};
+const DOOR_WORDS = ["tout à l'avant", "vers l'avant", "vers l'arrière", "tout à l'arrière"];
+
+function exitDoor(line, station, dir) {
+  const mine = load(`sortie.${line}.${station}.${dir}`);
+  if (mine !== null && mine !== "" && !isNaN(+mine)) return +mine;
+  const st = Object.keys(SORTIES[line] || {}).find(k => same(k, station));
+  const v = st ? SORTIES[line][st][Object.keys(SORTIES[line][st]).find(k => same(k, dir))] : undefined;
+  return typeof v === "number" ? v : null;
+}
+
+function trainSvg(door) {
+  // Rame de 2 voitures, la tête à droite (sens de la marche).
+  const carW = 140, carH = 46, gap = 8, x0 = 10, y0 = 18;
+  const doorX = i => { // 2 portes par voiture ; i = 0 en tête (à droite)
+    const car = i < 2 ? 1 : 0, k = i % 2;
+    const cx = x0 + car * (carW + gap);
+    return cx + (k === 0 ? carW * 0.68 : carW * 0.32);
+  };
+  let g = "";
+  for (let c = 0; c < 2; c++) {
+    const cx = x0 + c * (carW + gap);
+    const nose = c === 1;
+    g += nose
+      ? `<path d="M${cx} ${y0} h${carW - 18} q18 0 18 18 v${carH - 18} h-${carW} z" class="t-car"/>`
+      : `<rect x="${cx}" y="${y0}" width="${carW}" height="${carH}" rx="8" class="t-car"/>`;
+    // fenêtres
+    for (let w = 0; w < 3; w++) g += `<rect x="${cx + 10 + w * 44}" y="${y0 + 8}" width="30" height="13" rx="3" class="t-win"/>`;
+  }
+  g += `<rect x="${x0 + carW}" y="${y0 + 12}" width="${gap}" height="${carH - 22}" class="t-joint"/>`;
+  for (let i = 0; i < DOORS; i++) {
+    const x = doorX(i);
+    g += `<rect x="${x - 9}" y="${y0 + 24}" width="18" height="${carH - 24}" rx="2" class="t-door${i === door ? " on" : ""}" data-door="${i}"/>`;
+    g += `<rect x="${x - 16}" y="${y0 - 6}" width="32" height="${carH + 22}" class="t-hit" data-door="${i}"/>`;
+  }
+  if (door !== null) {
+    const x = doorX(door);
+    g += `<circle cx="${x}" cy="${y0 + carH + 12}" r="11" class="t-pulse"/><circle cx="${x}" cy="${y0 + carH + 12}" r="6" class="t-dot"/>`;
+  }
+  // sens de la marche
+  const ax = x0 + 2 * carW + gap + 12;
+  g += `<path d="M${ax} ${y0 + carH / 2} l14 0 m-6 -6 l6 6 l-6 6" class="t-arrow"/>`;
+  g += `<line x1="0" y1="${y0 + carH + 2}" x2="330" y2="${y0 + carH + 2}" class="t-rail"/>`;
+  return `<svg viewBox="0 0 330 92" role="img" aria-label="Rame vue de côté, la tête à droite">${g}</svg>`;
+}
+
+function renderTrain() {
+  const card = $("train-card");
+  if (!state.station || !state.dest || !state.dir) { card.hidden = true; return; }
+  card.hidden = false;
+  const door = exitDoor(state.line, state.dest, state.dir);
+  $("train-title").textContent = "Où monter pour sortir vite à " + state.dest;
+  $("train").innerHTML = trainSvg(door);
+  if (door === null) {
+    $("train-text").textContent = "Position pas encore connue";
+    $("train-help").textContent = `À ton prochain passage à ${state.dest}, touche la porte la plus proche de l'escalator : l'appli s'en souviendra.`;
+  } else {
+    $("train-text").textContent = "Monte " + DOOR_WORDS[door] + " de la rame";
+    $("train-help").textContent = "La rame avance vers la droite. Touche une autre porte pour corriger.";
+  }
+}
+
+$("train").addEventListener("click", e => {
+  const t = e.target.closest("[data-door]");
+  if (!t) return;
+  const i = +t.dataset.door;
+  const key = `sortie.${state.line}.${state.dest}.${state.dir}`;
+  if (exitDoor(state.line, state.dest, state.dir) === i && load(key) !== null) {
+    try { localStorage.removeItem("metro." + key); } catch (err) {}
+  } else store(key, String(i));
+  renderTrain();
+});
 
 function setLine(line) {
   state.line = line;
   state.station = null;
   state.dir = null;
+  state.dest = null;
   store("line", line);
   document.body.classList.toggle("line-b", line === "B");
   $("btn-a").classList.toggle("on", line === "A");
@@ -199,7 +302,7 @@ function setLine(line) {
   $("btn-a").setAttribute("aria-pressed", line === "A");
   $("btn-b").setAttribute("aria-pressed", line === "B");
   fillStations();
-  fillDirections();
+  fillDests();
   render();
 }
 
@@ -249,13 +352,13 @@ function render() {
     return;
   }
 
-  const atTerminus = same(state.station, state.dir);
+  const atTerminus = same(state.station, state.dest);
   const list = upcoming();
   if (atTerminus) {
     label.textContent = "";
     main.classList.add("small");
     main.textContent = "Tu es déjà au terminus";
-    next.textContent = "Choisis l'autre direction.";
+    next.textContent = "Choisis une autre station d'arrivée.";
     note.textContent = "";
     return;
   }
@@ -299,11 +402,13 @@ $("btn-b").addEventListener("click", () => setLine("B"));
 $("station").addEventListener("change", e => {
   state.station = e.target.value;
   store("station." + state.line, state.station);
+  fillDests();
   render();
 });
-$("direction").addEventListener("change", e => {
-  state.dir = e.target.value;
-  store("dir." + state.line, state.dir);
+$("dest").addEventListener("change", e => {
+  state.dest = e.target.value;
+  store("dest." + state.line, state.dest);
+  updateDir();
   render();
 });
 $("status").addEventListener("click", refresh);
@@ -317,10 +422,11 @@ setInterval(render, 1000);
 setInterval(() => { if (metroVisible()) refresh(); }, REFRESH_MS);
 window.metroRefresh = () => { if (Date.now() - state.lastOk > 10000) refresh(); };
 // Pour les favoris
-window.metroGet = () => ({ line: state.line, station: state.station, dir: state.dir });
-window.metroSet = (line, station, dir) => {
+window.metroGet = () => ({ line: state.line, station: state.station, dir: state.dir, dest: state.dest });
+window.metroSet = (line, station, dir, dest) => {
   store("station." + line, station);
   store("dir." + line, dir);
+  store("dest." + line, dest || dir);
   setLine(line);
   window.metroRefresh();
 };
