@@ -1,5 +1,6 @@
 import { getJSON, esc, nf, hm, hmH, dayShort, wmo, icon, barChart, errorBox, inDays, daysBetween, ymd, weekdayLetter, parisMidnight } from "./util.js";
 import { moonInfo, moonSVG } from "./moon.js";
+import { radarAt } from "./radar-point.js";
 import { createTidePredictor, stations } from "./tides-engine.js";
 import { forecastMap } from "./forecast-map.js";
 
@@ -31,7 +32,10 @@ export async function render(el, { place }) {
     return;
   }
   renderDays(el.querySelector("#m-days"), data);
-  renderRain(el.querySelector("#m-rain"), data);
+  const rainBox = el.querySelector("#m-rain");
+  renderRain(rainBox, data);
+  // Puis on affine avec le radar (la pluie qui tombe vraiment), dès qu'il répond.
+  radarAt(place).then(r => { if (r && rainBox.isConnected) renderRain(rainBox, data, r); }).catch(() => {});
 }
 
 /* ---------- Hier / Aujourd'hui / Demain ---------- */
@@ -336,30 +340,57 @@ function stormBox(d) {
 /* ---------- Pluie dans l'heure ---------- */
 const cls = r => r < 0.1 ? "sec" : r < 2.5 ? "faible" : r < 7.6 ? "moyenne" : "forte";
 
-function renderRain(box, data) {
+function renderRain(box, data, radar = null) {
   const m = data.minutely_15;
   if (!m || !m.time?.length) { box.innerHTML = `<h2>Pluie dans l'heure</h2>` + errorBox("Pas de prévision fine disponible ici."); return; }
   const now = Date.now();
-  // Chaque valeur = pluie tombée pendant les 15 min qui précèdent l'heure indiquée.
+  // Modèle : chaque valeur = pluie tombée pendant les 15 min qui précèdent l'heure indiquée.
   const slots = m.time.map((t, i) => ({ end: t * 1000, start: t * 1000 - 900000, rate: (m.precipitation[i] || 0) * 4 }));
-  let k = slots.findIndex(s => s.end > now);
-  if (k < 0) k = slots.length - 1;
-  const fut = slots.slice(k, k + 9); // ~2 h
+  const model = t => (slots.find(s => s.start <= t && s.end > t) || slots[slots.length - 1]).rate;
+
+  // Radar : mesures des dernières minutes et prévision immédiate. Il prime sur le modèle tant qu'il couvre le moment.
+  const rp = radar?.points || [];
+  const lastObs = rp.filter(p => !p.forecast).pop();
+  const radarEnd = rp.length ? rp[rp.length - 1].t + 5 * 60000 : 0;
+  const fromRadar = t => {
+    if (!rp.length || t > radarEnd) return null;
+    if (t <= rp[0].t) return rp[0].rate;
+    for (let i = 1; i < rp.length; i++) if (t <= rp[i].t) {
+      const a = rp[i - 1], b = rp[i], f = (t - a.t) / (b.t - a.t);
+      return a.rate + (b.rate - a.rate) * f;
+    }
+    return rp[rp.length - 1].rate; // juste après la dernière image : on la garde 5 min
+  };
+  // Sans prévision radar, la pluie mesurée maintenant se raccorde au modèle en 15 min.
+  const rateAt = t => {
+    const r = fromRadar(t);
+    if (r != null) return r;
+    const tail = rp.length && t - radarEnd < 15 * 60000 ? (1 - (t - radarEnd) / (15 * 60000)) : 0;
+    return tail > 0 ? rp[rp.length - 1].rate * tail + model(t) * (1 - tail) : model(t);
+  };
+
+  // Frise toutes les 5 min sur 2 h
+  const t0 = Math.floor(now / 300000) * 300000;
+  const fut = Array.from({ length: 25 }, (_, i) => { const t = i === 0 ? now : t0 + i * 300000; return { start: t, end: t, rate: rateAt(t) }; });
   const raining = fut[0].rate >= 0.1;
+  const inMin = t => Math.max(1, Math.round((t - now) / 60000));
+  const when = t => inMin(t) <= 55 ? `dans ${inMin(t)} min` : `vers ${hmH(new Date(t))}`;
   let lead, pill;
   if (raining) {
     const stop = fut.findIndex(s => s.rate < 0.1);
-    lead = stop > 0 ? `Ça s'arrête vers ${hmH(new Date(fut[stop - 1].end))}` : "La pluie continue pendant au moins 2 h";
+    lead = stop > 0 ? `Ça s'arrête ${when(fut[stop].start)}` : "La pluie continue pendant au moins 2 h";
     pill = `<span class="pill" style="background:#5BB8FF">EN COURS</span>`;
   } else {
     const start = fut.findIndex(s => s.rate >= 0.1);
-    lead = start >= 0 ? `Pluie vers ${hmH(new Date(fut[start].start))}` : "Pas de pluie dans les 2 prochaines heures";
+    lead = start >= 0 ? `Pluie ${when(fut[start].start)}` : "Pas de pluie dans les 2 prochaines heures";
     pill = start >= 0 ? `<span class="pill" style="background:#F4C76B">BIENTÔT</span>` : `<span class="pill" style="background:#4CC38A">SEC</span>`;
   }
-  const at = t => (slots.find(s => s.start <= t && s.end > t) || fut[fut.length - 1]).rate;
-  const r20 = at(now + 20 * 60000);
+  const r20 = rateAt(now + 20 * 60000);
   const words = { sec: "sec", faible: "pluie faible", moyenne: "pluie moyenne", forte: "pluie forte" };
   const detail = (raining ? `${cap1(words[cls(fut[0].rate)])} maintenant. ` : "") + `Dans 20 min : ${words[cls(r20)]}.`;
+  const srcNote = lastObs
+    ? `Maintenant : ${radar.source} (image de ${hm(new Date(lastObs.t))})${rp.some(p => p.forecast) ? " et sa prévision immédiate" : ""}, puis prévision Météo-France AROME.`
+    : "Prévision Météo-France AROME par quart d'heure, actualisée toutes les heures (radar indisponible).";
 
   // Courbe lissée sur 3 bandes Faible / Moyenne / Forte
   const W = 340, H = 196, top = 0, bandH = 50, base = top + bandH * 3; // y=150 = 0 mm/h
@@ -380,7 +411,7 @@ function renderRain(box, data) {
     d += ` C${c1[0].toFixed(1)} ${c1[1].toFixed(1)} ${c2[0].toFixed(1)} ${c2[1].toFixed(1)} ${p2[0].toFixed(1)} ${p2[1].toFixed(1)}`;
   }
   const area = `${d} L${pts[n - 1][0]} ${base} L${pts[0][0]} ${base} Z`;
-  const labels = fut.map((s, i) => i % 2 === 0 ? `<text x="${X(i).toFixed(1)}" y="${base + 20}" text-anchor="middle" fill="${i === 0 ? "#EAF0FA" : "#9AA8C2"}" font-size="11" font-weight="${i === 0 ? 800 : 600}">${i === 0 ? "Maint." : hm(new Date(s.end))}</text>` : "").join("");
+  const labels = fut.map((s, i) => i % 6 === 0 ? `<text x="${X(i).toFixed(1)}" y="${base + 20}" text-anchor="middle" fill="${i === 0 ? "#EAF0FA" : "#9AA8C2"}" font-size="11" font-weight="${i === 0 ? 800 : 600}">${i === 0 ? "Maint." : hm(new Date(s.end))}</text>` : "").join("");
   const svg = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Intensité de la pluie sur les 2 prochaines heures">
     <rect x="0" y="0" width="${W}" height="50" fill="#0F182B"/><rect x="0" y="50" width="${W}" height="50" fill="#121C30"/><rect x="0" y="100" width="${W}" height="50" fill="#0F182B"/>
     <line x1="0" y1="50" x2="${W}" y2="50" stroke="#22304D"/><line x1="0" y1="100" x2="${W}" y2="100" stroke="#22304D"/><line x1="0" y1="150" x2="${W}" y2="150" stroke="#2A3A5C"/>
@@ -396,7 +427,7 @@ function renderRain(box, data) {
     <div class="card-head"><h2>Pluie dans l'heure</h2>${pill}</div>
     <div style="display:flex;flex-direction:column;gap:4px"><p class="lead">${lead}</p><p class="txt">${detail}</p></div>
     ${svg}
-    <p class="small">Prévision Météo-France AROME par quart d'heure, actualisée toutes les heures.</p>`;
+    <p class="small">${srcNote}</p>`;
 }
 const cap1 = s => s[0].toUpperCase() + s.slice(1);
 
