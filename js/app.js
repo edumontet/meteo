@@ -7,6 +7,10 @@ import * as soleil from "./tab-soleil.js";
 import * as champis from "./tab-champis.js";
 
 const TABS = { meteo, modeles, orages, soleil, champis };
+// Numéro de version affiché en bas de l'appli : à augmenter à chaque mise en ligne (avec CACHE dans sw.js).
+export const VERSION = "1.11";
+export const VERSION_DATE = "17/11/2026 07h05";
+
 const DEFAULT = { lat: 48.1173, lon: -1.6778, name: "Rennes", mode: "default" };
 const store = {
   get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
@@ -182,6 +186,7 @@ function setupDialog() {
 
 function footer() {
   document.getElementById("foot").innerHTML =
+    `<span class="ver">Version ${VERSION} · ${VERSION_DATE}</span><br>` +
     `Données : <a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo</a> (Météo-France, ECMWF, NOAA) · ` +
     `<a href="https://www.rainviewer.com" target="_blank" rel="noopener">RainViewer</a> · ` +
     `<a href="https://www.blitzortung.org" target="_blank" rel="noopener">Blitzortung.org</a> · ` +
