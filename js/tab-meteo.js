@@ -18,7 +18,7 @@ export async function render(el, { place }) {
   renderRadar(el.querySelector("#m-radar"), place);
 
   const url = `https://api.open-meteo.com/v1/forecast?latitude=${place.lat}&longitude=${place.lon}` +
-    `&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,snowfall_sum,precipitation_probability_max,wind_gusts_10m_max,wind_speed_10m_max,wind_direction_10m_dominant,uv_index_max` +
+    `&daily=weather_code,cloud_cover_mean,temperature_2m_max,temperature_2m_min,precipitation_sum,snowfall_sum,precipitation_probability_max,wind_gusts_10m_max,wind_speed_10m_max,wind_direction_10m_dominant,uv_index_max` +
     `&minutely_15=precipitation&past_minutely_15=2&forecast_minutely_15=10` +
     `&hourly=precipitation,precipitation_probability,wind_speed_10m,wind_gusts_10m,wind_direction_10m,uv_index` +
     `&current=temperature_2m,weather_code,wind_speed_10m,wind_gusts_10m,wind_direction_10m,uv_index` +
@@ -43,10 +43,17 @@ function renderDays(box, data) {
   const d = data.daily;
   const labels = ["Hier", "Aujourd'hui", "Demain"];
   const days = d.time.slice(0, 3).map((t, i) => {
-    const [txt, kind] = wmo(d.weather_code[i]);
+    let [txt, kind] = wmo(d.weather_code[i]);
     const snow = d.snowfall_sum[i] || 0;
     const tmin = d.temperature_2m_min[i];
     const pr = d.precipitation_sum[i] || 0;
+    // Le code du jour d'Open-Meteo est le « pire » temps de la journée : une seule heure de bruine
+    // suffit à afficher de la pluie. Si presque rien ne tombe sur la journée, on montre plutôt les nuages.
+    if (["rain", "snow"].includes(kind) && pr < 0.5 && snow < 0.1) {
+      const cc = d.cloud_cover_mean?.[i];
+      [txt, kind] = cc == null || cc >= 70 ? ["Couvert", "cloud"] : cc >= 35 ? ["Éclaircies", "suncloud"] : ["Plutôt ensoleillé", "sun"];
+      if (pr >= 0.1) txt += ", quelques gouttes";
+    }
     let snowTxt = "Aucun";
     if (snow >= 0.1) snowTxt = "Oui · " + nf(snow, 1) + " cm";
     else if (tmin <= 1 && pr > 0.5) snowTxt = "Possible";

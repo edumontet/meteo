@@ -8,8 +8,8 @@ import * as champis from "./tab-champis.js";
 
 const TABS = { meteo, modeles, orages, soleil, champis };
 // Numéro de version affiché en bas de l'appli : à augmenter à chaque mise en ligne (avec CACHE dans sw.js).
-export const VERSION = "1.11";
-export const VERSION_DATE = "17/11/2026 07h05";
+export const VERSION = "1.12";
+export const VERSION_DATE = "26/11/2026 06h15";
 
 const DEFAULT = { lat: 48.1173, lon: -1.6778, name: "Rennes", mode: "default" };
 const store = {
