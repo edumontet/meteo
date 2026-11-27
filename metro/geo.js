@@ -86,6 +86,8 @@
       }
       if (best.line !== cur.line || best.name !== cur.station) window.metroSetStation(best.line, best.name);
       const m = Math.round(best.d / 10) * 10;
+      window.hereStation = best.name; // pour les favoris qui partent d'ici
+      if (window.favHere) window.favHere();
       show(`<span class="pin">●</span> Tu es à <b>${best.name}</b> · ${m < 50 ? "sur place" : "à " + m + " m"}`, true);
     }, err => {
       if (manual) show(err.code === 1 ? "Localisation refusée : autorise-la dans Réglages › Safari" : "Position introuvable");
