@@ -203,3 +203,21 @@ body[data-tab="bus"] .ico-metro { display: none; }
 @keyframes t-pulse { 0% { transform: scale(.5); opacity: .6; } 100% { transform: scale(1.8); opacity: 0; } }
 .train-text { font-size: 18px; font-weight: 700; text-align: center; color: var(--text); }
 .train-help { font-size: 12px; color: var(--muted); text-align: center; }
+
+/* Localisation : station la plus proche */
+.lbl-row { display: flex; align-items: center; justify-content: space-between; margin: 14px 0 8px; }
+.lbl-row .lbl { margin: 0; }
+.locate {
+  display: flex; align-items: center; gap: 5px; background: none; border: 1px solid var(--line2);
+  border-radius: 999px; padding: 4px 10px; font-size: 12px; font-weight: 600; color: var(--c-soft);
+}
+.here {
+  margin: 2px 0 8px; padding: 10px 12px; border-radius: 12px; background: var(--c-bg);
+  border: 1px solid var(--c); font-size: 15px; color: var(--text);
+}
+.here b { font-weight: 800; font-size: 17px; }
+.here .pin { color: #FF3B30; animation: t-blink 1s ease-in-out infinite; }
+.here.flash { animation: here-flash .5s ease-in-out 4; }
+select.flash { animation: sel-flash .5s ease-in-out 4; }
+@keyframes here-flash { 0%, 100% { background: var(--c-bg); } 50% { background: var(--c); } }
+@keyframes sel-flash { 0%, 100% { border-color: var(--line2); box-shadow: none; } 50% { border-color: var(--c); box-shadow: 0 0 0 4px var(--c); } }
