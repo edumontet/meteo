@@ -17,7 +17,9 @@ self.addEventListener("fetch", e => {
   if (e.request.method !== "GET" || url.origin !== location.origin) return; // les API passent directement
   // Réseau d'abord (pour avoir toujours la dernière version), cache si hors ligne.
   e.respondWith(
-    fetch(e.request).then(r => {
+    // « no-cache » : on redemande toujours au serveur si le fichier a changé (pas de vieille copie).
+    fetch(e.request.url, { cache: "no-cache", credentials: "same-origin" }).then(r => {
+      if (!r.ok) return r;
       const copy = r.clone();
       caches.open(CACHE).then(c => c.put(e.request, copy));
       return r;

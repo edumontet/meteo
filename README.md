@@ -57,3 +57,7 @@ Les plans et leur calage sont enregistrés dans le téléphone (rien n'est envoy
 ## Mon arrêt (application indépendante)
 
 Le dossier `sevrage/` contient une web app à part, sans lien avec la météo ni le métro, à l'adresse `https://edumontet.github.io/meteo/sevrage/`. Elle compte les jours sans alcool (depuis le 5 octobre 2026) et sans tabac (depuis le 18 octobre 2026), calcule les économies en direct (10 €/jour d'alcool, 13,50 €/jour de tabac) et propose un texte à lire pour chaque semaine, chaque mois puis chaque année, avec ses sources. Les dates et les montants sont fixés dans `sevrage/index.html`.
+
+## Mises à jour automatiques
+
+Chaque appli charge `update.js` : quand on la rouvre (ou qu'elle revient au premier plan), elle compare ses fichiers à ceux du serveur et se recharge toute seule s'ils ont changé. Pas besoin de supprimer puis réinstaller l'appli de l'écran d'accueil, ni de numéro de version à changer à la mise en ligne. Le service worker (`sw.js`) redemande toujours les fichiers au serveur (jamais de vieille copie) et ne sert le cache que hors connexion.
