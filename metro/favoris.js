@@ -84,6 +84,16 @@
     return null;
   }
 
+  // Favori qui part de la station où l'on se trouve (trouvée par la localisation).
+  const isHere = f => !!window.hereStation && same(f.t === "metro" ? f.station : f.from, window.hereStation);
+  window.favHere = () => {
+    draw();
+    [...$("fav-list").children].forEach(li => {
+      if (!li.classList.contains("here")) return;
+      li.classList.remove("flash"); void li.offsetWidth; li.classList.add("flash");
+    });
+  };
+
   function draw() {
     const list = $("fav-list");
     $("fav-empty").hidden = favs.length > 0;
@@ -103,6 +113,7 @@
       const f = favs[i], n = nextOf(f), first = n[0];
       const tag = li.querySelector(".f-tag"), name = li.querySelector(".f-name"), sub = li.querySelector(".f-sub"), when = li.querySelector(".f-when"), nxt = li.querySelector(".f-next");
       li.classList.toggle("on", keyOf(f) === cur);
+      li.classList.toggle("here", isHere(f));
       let subTxt;
       if (f.t === "metro") {
         tag.className = "f-tag metro-" + f.line.toLowerCase();
