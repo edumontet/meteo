@@ -430,3 +430,9 @@ window.metroSet = (line, station, dir, dest) => {
   setLine(line);
   window.metroRefresh();
 };
+// Pour la localisation : choisir une station (et sa ligne) sans toucher à la station d'arrivée.
+window.metroSetStation = (line, station) => {
+  store("station." + line, station);
+  setLine(line);
+  window.metroRefresh();
+};

@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="metro.css?v=9">
+<link rel="stylesheet" href="metro.css?v=10">
 </head>
 <body data-tab="metro">
 <div class="app">
@@ -54,7 +54,11 @@
         <button type="button" id="btn-b" data-line="B">Ligne B</button>
       </div>
 
-      <label class="lbl" for="station">Station</label>
+      <div class="lbl-row">
+        <label class="lbl" for="station">Station</label>
+        <button type="button" class="locate" id="locate" aria-label="Trouver la station la plus proche"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg><span>Autour de moi</span></button>
+      </div>
+      <div class="here" id="here" hidden></div>
       <select id="station"></select>
 
       <label class="lbl" for="dest">Je descends à</label>
@@ -126,9 +130,10 @@
 
   <footer class="foot">Données temps réel : STAR / Rennes Métropole (data.explore.star.fr), licence ODbL.</footer>
 </div>
-<script src="metro.js?v=9"></script>
-<script src="bus.js?v=9"></script>
-<script src="favoris.js?v=9"></script>
-<script src="tabs.js?v=9"></script>
+<script src="metro.js?v=10"></script>
+<script src="geo.js?v=10"></script>
+<script src="bus.js?v=10"></script>
+<script src="favoris.js?v=10"></script>
+<script src="tabs.js?v=10"></script>
 </body>
 </html>
